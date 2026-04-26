@@ -1,51 +1,49 @@
 // =============================================================
-// 📚 SCRIPT SEEDER — Membuat Akun Pertama
+// 📚 SCRIPT SEEDER — Membuat Akun Pertama (PostgreSQL/Supabase)
 // =============================================================
 // Jalankan script ini dengan: node scripts/seed.js
 // =============================================================
 
-const { PrismaClient } = require("../app/generated/prisma/index.js");
+const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 
-const prisma = new PrismaClient();
-
 async function main() {
-  console.log("Mulai membuat akun admin pertama...");
-
-  // Cek apakah akun sudah ada
-  const existing = await prisma.account.findUnique({
-    where: { username: "admin" },
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || process.env.DIRECT_URL,
   });
 
-  if (existing) {
+  console.log("Menghubungkan ke database Supabase...");
+
+  // Cek apakah akun admin sudah ada
+  const check = await pool.query(
+    "SELECT id FROM accounts WHERE username = $1",
+    ["admin"]
+  );
+
+  if (check.rows.length > 0) {
     console.log("Akun admin sudah ada di database!");
+    await pool.end();
     return;
   }
 
   // Enkripsi password
-  const saltRounds = 10;
-  const hashedPassword = await bcrypt.hash("admin123", saltRounds);
+  const hashedPassword = await bcrypt.hash("admin123", 10);
 
-  // Buat akun
-  await prisma.account.create({
-    data: {
-      nama: "Administrator",
-      username: "admin",
-      password: hashedPassword,
-      role: "ADMIN",
-    },
-  });
+  // Buat akun admin
+  await pool.query(
+    `INSERT INTO accounts (nama, username, password, role, created_at) 
+     VALUES ($1, $2, $3, $4, NOW())`,
+    ["Administrator", "admin", hashedPassword, "ADMIN"]
+  );
 
-  console.log("✅ Berhasil membuat akun Admin!");
+  console.log("✅ Berhasil membuat akun Admin di Supabase!");
   console.log("Username : admin");
   console.log("Password : admin123");
+
+  await pool.end();
 }
 
-main()
-  .catch((e) => {
-    console.error("Terjadi kesalahan:", e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((e) => {
+  console.error("Terjadi kesalahan:", e);
+  process.exit(1);
+});
