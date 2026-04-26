@@ -1,0 +1,132 @@
+// =============================================================
+// 📚 PRISMA SCHEMA — Definisi Struktur Database
+// =============================================================
+// 
+// KONSEP: Prisma Schema adalah "blueprint" database kamu.
+// Di sini kita mendefinisikan:
+//   1. Generator  → Bagaimana Prisma menghasilkan kode client
+//   2. Datasource → Database apa yang dipakai (SQLite)
+//   3. Model      → Tabel-tabel di database
+//
+// Prisma akan membaca file ini dan:
+//   - Membuat tabel di database (migration)
+//   - Menghasilkan TypeScript/JS client untuk query data
+//
+// ANALOGI: Seperti CREATE TABLE di SQL, tapi lebih readable
+// =============================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+  // output → Lokasi dimana Prisma Client di-generate
+  // Kita taruh di app/generated agar mudah diakses
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================
+// MODEL: User (Tabel Pengguna)
+// =============================================================
+// Menyimpan data karyawan: Nomor Finger, NIP/NIK, dan Nama
+//
+// KONSEP:
+// - @id          → Primary key (identitas unik setiap record)
+// - @default     → Nilai default saat record dibuat
+// - autoincrement() → ID otomatis bertambah (1, 2, 3, ...)
+// - @unique      → Tidak boleh ada duplikat
+// - @map         → Nama kolom di database (bisa beda dari nama field)
+// - @@map        → Nama tabel di database
+// =============================================================
+model User {
+  id          Int       @id @default(autoincrement())
+  nomorFinger String    @unique @map("nomor_finger")
+  nip         String    @unique // NIP atau NIK karyawan
+  nama        String           // Nama lengkap karyawan
+  createdAt   DateTime  @default(now()) @map("created_at")
+  deletedAt   DateTime? @map("deleted_at") // null = aktif, terisi = sudah dihapus (soft delete)
+  accountId   Int?      @map("account_id") // ID dari Account pembuat data
+
+  // RELASI: Satu user bisa punya banyak baris SPKL
+  // Ini disebut "One-to-Many Relationship"
+  spklRows    SpklRow[]
+
+  @@map("users") // Nama tabel di database = "users"
+}
+
+// =============================================================
+// MODEL: Spkl (Tabel Surat Perintah Kerja Lembur)
+// =============================================================
+// Menyimpan header SPKL (tanggal dibuat)
+// Satu SPKL bisa punya banyak baris detail (SpklRow)
+// =============================================================
+model Spkl {
+  id        Int       @id @default(autoincrement())
+  createdAt DateTime  @default(now()) @map("created_at")
+  status    String    @default("DRAFT") // "DRAFT" | "FINAL"
+  accountId Int?      @map("account_id") // ID dari Account pembuat SPKL
+
+  // RELASI: Satu SPKL punya banyak baris
+  rows      SpklRow[]
+
+  @@map("spkl")
+}
+
+// =============================================================
+// MODEL: SpklRow (Tabel Detail Baris SPKL)
+// =============================================================
+// Setiap baris berisi: Siapa (user), Kapan (tanggal), Apa (keterangan)
+//
+// KONSEP RELASI:
+// - userId → Foreign Key ke tabel User
+// - spklId → Foreign Key ke tabel Spkl
+// - @relation → Mendefinisikan hubungan antar tabel
+//   - fields: [userId]    → Kolom di tabel ini yang jadi FK
+//   - references: [id]    → Kolom di tabel target yang dirujuk
+// =============================================================
+model SpklRow {
+  id          Int      @id @default(autoincrement())
+  
+  userId      Int      @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  // ^ Relasi ke User: "baris ini milik user dengan id = userId"
+  
+  spklId      Int      @map("spkl_id")
+  spkl        Spkl     @relation(fields: [spklId], references: [id], onDelete: Cascade)
+  // ^ Relasi ke Spkl: "baris ini bagian dari SPKL dengan id = spklId"
+  // onDelete: Cascade → Jika SPKL dihapus, semua barisnya ikut terhapus
+  
+  tanggal     String   // Format: YYYY-MM-DD
+  keterangan  String   // Deskripsi pekerjaan lembur
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("spkl_rows")
+}
+
+// =============================================================
+// MODEL: Account (Tabel Akun Login)
+// =============================================================
+// Menyimpan data pengguna yang memiliki akses login ke sistem
+// =============================================================
+model Account {
+  id        Int      @id @default(autoincrement())
+  nama      String   // Nama pengguna untuk ditampilkan di sidebar
+  username  String   @unique
+  password  String   // Akan disimpan dalam bentuk hash (bcrypt)
+  role      String   @default("USER") // "ADMIN" atau "USER"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("accounts")
+}
+
+// =============================================================
+// MODEL: Setting (Pengaturan Sistem Dinamis)
+// =============================================================
+model Setting {
+  key   String @id
+  value String
+
+  @@map("settings")
+}

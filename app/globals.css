@@ -1,0 +1,373 @@
+/* =============================================================
+   📚 GLOBALS.CSS — Design System & Tailwind Configuration
+   =============================================================
+   
+   KONSEP: Neubrutalism / Flat-Brutalist
+   
+   Karakteristik utama yang diterapkan:
+   1. High Contrast: Hitam pekat, putih bersih, dan warna primer cerah.
+   2. Hard Shadows: Bayangan menggunakan blok warna solid (tanpa blur).
+   3. Thick Borders: Garis tepi tebal (biasanya 3px) untuk memisahkan elemen.
+   4. Sharp Edges: Sudut kotak (border-radius: 0).
+   5. Taktil Feedback: Tombol akan tertekan (translate) dan shadow hilang saat diklik.
+   ============================================================= */
+
+@import "tailwindcss";
+
+@theme inline {
+  /* --- Warna Utama (Industrial / Brutalist) --- */
+  --color-surface: #e5e5e5;
+  /* Latar belakang abu-abu industrial */
+  --color-surface-light: #f0f0f0;
+  /* Latar belakang sekunder */
+  --color-card: #ffffff;
+  /* Warna card putih bersih */
+
+  --color-primary: #000000;
+  /* Hitam pekat sebagai primer */
+  --color-primary-hover: #333333;
+  --color-primary-light: #9ca3af;
+
+  --color-text-dark: #000000;
+  /* Teks utama hitam pekat */
+  --color-text-muted: #52525b;
+  /* Teks sekunder abu-abu gelap */
+  --color-text-light: #a1a1aa;
+
+  --color-danger: #ff3333;
+  /* Merah terang mencolok */
+  --color-danger-hover: #cc0000;
+  --color-success: #00cc66;
+  /* Hijau terang mencolok */
+  --color-success-hover: #00994d;
+
+  /* --- Neo-Brutalist Shadows (Tanpa Blur) --- */
+  --shadow-brutal: 4px 4px 0px 0px #000000;
+  --shadow-brutal-hover: 6px 6px 0px 0px #000000;
+  --shadow-brutal-active: 0px 0px 0px 0px #000000;
+  /* Shadow hilang saat ditekan */
+
+  /* --- Borders --- */
+  --border-brutal: 3px solid #000000;
+  --border-thin: 2px solid #000000;
+
+  /* --- Font --- */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* --- Border Radius (Brutalist = Kotak) --- */
+  --radius-neu: 0px;
+  --radius-neu-sm: 0px;
+
+  /* --- Transition --- */
+  --transition-neu: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+/* =============================================================
+   BASE STYLES — Reset & Global
+   ============================================================= */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-text-dark);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =============================================================
+   BRUTALIST COMPONENT CLASSES
+   (Nama class dipertahankan 'neu-*' agar tidak merusak HTML lama)
+   ============================================================= */
+
+/* Card Container */
+.neu-card {
+  background: var(--color-card);
+  border-radius: var(--radius-neu);
+  border: var(--border-brutal);
+  box-shadow: var(--shadow-brutal);
+  transition: var(--transition-neu);
+}
+
+/* Input field */
+.neu-input {
+  background: var(--color-surface-light);
+  border: var(--border-brutal);
+  border-radius: var(--radius-neu);
+  padding: 12px 16px;
+  font-size: 0.938rem;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  outline: none;
+  transition: var(--transition-neu);
+  width: 100%;
+  font-family: var(--font-sans);
+  box-shadow: inset 2px 2px 0px 0px rgba(0, 0, 0, 0.05);
+  /* Sedikit kedalaman inset */
+}
+
+.neu-input::placeholder {
+  color: var(--color-text-light);
+  font-weight: 500;
+}
+
+.neu-input:focus {
+  background: var(--color-card);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-brutal);
+  transform: translate(-2px, -2px);
+}
+
+/* Tombol Base */
+.neu-btn {
+  background: var(--color-card);
+  border: var(--border-brutal);
+  border-radius: var(--radius-neu);
+  box-shadow: var(--shadow-brutal);
+  padding: 12px 24px;
+  font-size: 0.938rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: var(--transition-neu);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  color: var(--color-text-dark);
+}
+
+.neu-btn:hover {
+  background: var(--color-surface-light);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-brutal-hover);
+}
+
+.neu-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: var(--shadow-brutal-active);
+}
+
+/* Varian tombol berwarna */
+.neu-btn-primary {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.neu-btn-primary:hover {
+  background: var(--color-primary-hover);
+  color: #ffffff;
+}
+
+.neu-btn-danger {
+  background: var(--color-danger);
+  color: #ffffff;
+}
+
+.neu-btn-danger:hover {
+  background: var(--color-danger-hover);
+}
+
+.neu-btn-success {
+  background: var(--color-success);
+  color: #000000;
+  /* Hitam di atas hijau untuk kontras maksimal */
+}
+
+.neu-btn-success:hover {
+  background: var(--color-success-hover);
+  color: #ffffff;
+}
+
+/* Select Dropdown */
+.neu-select {
+  background: var(--color-surface-light);
+  border: var(--border-brutal);
+  border-radius: var(--radius-neu);
+  padding: 12px 16px;
+  font-size: 0.938rem;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  outline: none;
+  transition: var(--transition-neu);
+  width: 100%;
+  cursor: pointer;
+  appearance: none;
+  font-family: var(--font-sans);
+  /* Custom Arrow Hitam Tebal */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 48px;
+}
+
+.neu-select:focus {
+  background: var(--color-card);
+  box-shadow: var(--shadow-brutal);
+  transform: translate(-2px, -2px);
+}
+
+/* Typography Khusus */
+.brutal-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--color-text-muted);
+}
+
+.brutal-divider {
+  border-bottom: 3px solid var(--color-primary);
+  margin: 1.5rem 0;
+}
+
+/* =============================================================
+   TABLE STYLES
+   ============================================================= */
+.neu-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: var(--border-brutal);
+}
+
+.neu-table thead th {
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-dark);
+  background: var(--color-surface);
+  border-bottom: var(--border-brutal);
+  border-right: 2px solid #000;
+}
+
+.neu-table thead th:last-child {
+  border-right: none;
+}
+
+.neu-table tbody tr {
+  background: var(--color-card);
+  transition: background 0.1s ease;
+}
+
+.neu-table tbody tr:hover {
+  background: var(--color-surface-light);
+}
+
+.neu-table tbody td {
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-bottom: 2px solid #000;
+  border-right: 2px solid #000;
+}
+
+.neu-table tbody td:last-child {
+  border-right: none;
+}
+
+.neu-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* =============================================================
+   TOAST NOTIFICATION (Brutalist)
+   ============================================================= */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 16px 24px;
+  border: var(--border-brutal);
+  border-radius: 0;
+  font-weight: 800;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  z-index: 1000;
+  animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-brutal);
+}
+
+.toast-success {
+  background: var(--color-success);
+  color: #000;
+}
+
+.toast-error {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* =============================================================
+   SCROLLBAR CUSTOM (Industrial / Blocky)
+   ============================================================= */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-light);
+  border-left: 2px solid #000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #000000;
+  border: 2px solid var(--color-surface-light);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333333;
+}
+
+/* =============================================================
+   RESPONSIVE UTILITIES
+   ============================================================= */
+@media (max-width: 768px) {
+  .neu-btn {
+    padding: 10px 16px;
+    font-size: 0.875rem;
+  }
+
+  /* Di layar kecil, kurangi ketebalan shadow sedikit jika perlu */
+  .neu-card {
+    box-shadow: 4px 4px 0px 0px #000000;
+  }
+}
