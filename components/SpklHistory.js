@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Pencil, Trash2, Download, FileText, CheckCircle2, Clock } from "lucide-react";
+import { Loader2, Pencil, Trash2, Download, FileText, CheckCircle2, Clock, User } from "lucide-react";
 import { exportSpklToExcel } from "@/lib/excelExport";
 
 import ConfirmModal from "./ConfirmModal";
@@ -10,7 +10,7 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
   const [deletingId, setDeletingId] = useState(null);
   const [filterMonth, setFilterMonth] = useState("ALL");
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
-  
+
   // Confirm Modal state
   const [confirmState, setConfirmState] = useState({ isOpen: false, id: null });
 
@@ -21,7 +21,7 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
   async function handleDeleteConfirm() {
     const id = confirmState.id;
     setConfirmState({ isOpen: false, id: null });
-    
+
     if (!id) return;
     setDeletingId(id);
     await onDelete(id);
@@ -40,7 +40,7 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
     const dateObj = new Date(spkl.createdAt);
     const m = (dateObj.getMonth() + 1).toString();
     const y = dateObj.getFullYear().toString();
-    
+
     if (filterMonth !== "ALL" && m !== filterMonth) return false;
     if (filterYear !== "ALL" && y !== filterYear) return false;
     return true;
@@ -102,31 +102,31 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
               DAFTAR TERSIMPAN
             </h2>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-2">
-            <select 
-              value={filterMonth} 
+            <select
+              value={filterMonth}
               onChange={(e) => setFilterMonth(e.target.value)}
               className="neu-select py-1.5 text-xs w-32"
             >
               <option value="ALL">Semua Bulan</option>
-              {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                 <option key={m} value={m.toString()}>{new Date(2000, m - 1).toLocaleString('id-ID', { month: 'long' })}</option>
               ))}
             </select>
 
-            <select 
-              value={filterYear} 
+            <select
+              value={filterYear}
               onChange={(e) => setFilterYear(e.target.value)}
               className="neu-select py-1.5 text-xs w-24"
             >
               <option value="ALL">Semua Tahun</option>
-              {availableYears.sort((a,b) => b-a).map(y => (
+              {availableYears.sort((a, b) => b - a).map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
 
-            <button 
+            <button
               onClick={handleExportBulanan}
               className="neu-btn neu-btn-success text-xs py-1.5 flex items-center gap-2 ml-2"
             >
@@ -134,7 +134,7 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
             </button>
           </div>
         </div>
-        
+
         <div className="border-t-2 border-dashed border-primary-light mb-4" />
       </div>
 
@@ -146,6 +146,7 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
               <th className="text-left px-8 py-4 brutal-label w-16">ID</th>
               <th className="text-left px-8 py-4 brutal-label">TANGGAL DIBUAT</th>
               <th className="text-left px-8 py-4 brutal-label">JML BARIS</th>
+              <th className="text-left px-8 py-4 brutal-label">DIBUAT OLEH</th>
               <th className="text-left px-8 py-4 brutal-label">STATUS</th>
               <th className="text-right px-8 py-4 brutal-label">AKSI</th>
             </tr>
@@ -160,7 +161,7 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
             ) : filteredList.map((spkl, index) => {
               const dateObj = new Date(spkl.createdAt);
               const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()} ${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
-              
+
               const isDraft = spkl.status === "DRAFT";
 
               return (
@@ -177,6 +178,9 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
                   </td>
                   <td className="px-8 py-4 text-xs font-semibold text-text-dark">
                     {spkl._count?.rows || spkl.rows?.length || 0} baris
+                  </td>
+                  <td className="px-8 py-4 text-xs font-medium text-text-dark">
+                    {spkl.account?.nama || "Sistem"}
                   </td>
                   <td className="px-8 py-4">
                     {isDraft ? (

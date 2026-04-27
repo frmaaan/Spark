@@ -16,8 +16,8 @@
 // =============================================================
 
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider = "prisma-client-js"
+  // output   = "../app/generated/prisma"
   // output → Lokasi dimana Prisma Client di-generate
   // Kita taruh di app/generated agar mudah diakses
 }
@@ -66,6 +66,8 @@ model Spkl {
   createdAt DateTime  @default(now()) @map("created_at")
   status    String    @default("DRAFT") // "DRAFT" | "FINAL"
   accountId Int?      @map("account_id") // ID dari Account pembuat SPKL
+
+  account   Account?  @relation(fields: [accountId], references: [id])
 
   // RELASI: Satu SPKL punya banyak baris
   rows      SpklRow[]
@@ -117,6 +119,8 @@ model Account {
   password  String   // Akan disimpan dalam bentuk hash (bcrypt)
   role      String   @default("USER") // "ADMIN" atau "USER"
   createdAt DateTime @default(now()) @map("created_at")
+
+  spkls     Spkl[]
 
   @@map("accounts")
 }
