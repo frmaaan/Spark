@@ -51,6 +51,8 @@ model User {
   // RELASI: Satu user bisa punya banyak baris SPKL
   // Ini disebut "One-to-Many Relationship"
   spklRows    SpklRow[]
+  teamId      Int?      
+  team        Team?     @relation(fields: [teamId], references: [id])
 
   @@map("users") // Nama tabel di database = "users"
 }
@@ -150,6 +152,7 @@ model Team {
 
   accounts  Account[] // Berubah jadi jamak (accounts)
   todos     Todo[]
+  users User[]
 
   @@map("teams")
 }
@@ -159,12 +162,12 @@ model Team {
 // =============================================================
 model Todo {
   id        Int       @id @default(autoincrement())
-  task      String    // Diubah dari 'nama' menjadi 'task'
+  task      String
   description String?  @db.Text
-  isDone    Boolean   @default(false)
+  status    String    @default("TODO") // "TODO" | "IN_PROGRESS" | "DONE"
   tipe      String    @default("PERSONAL") // "PERSONAL" | "TEAM"
   
-  authorId  Int       @map("author_id") // Huruf kecil
+  authorId  Int       @map("author_id")
   author    Account   @relation(fields: [authorId], references: [id], onDelete: Cascade)
   
   teamId    Int?      @map("team_id")
@@ -173,4 +176,16 @@ model Todo {
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("todos")
+}
+
+// =============================================================
+// MODEL: TodoTemplate (Template Checklist dari Admin)
+// =============================================================
+model TodoTemplate {
+  id        Int      @id @default(autoincrement())
+  title     String   // Judul template: "Checklist Harian Gudang"
+  items     String   @db.Text // JSON array: ["Cek stok", "Update inventaris", ...]
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("todo_templates")
 }

@@ -27,7 +27,7 @@ export default function PenggunaPage() {
   const handleAddUser = useCallback(async (formData) => {
     const result = await addUser(formData);
     if (result.success) {
-      setUsers((prev) => [result.data, ...prev]);
+      await loadUsers();
       setToast({ message: "Pengguna berhasil ditambahkan!", type: "success" });
       return true;
     } else {
@@ -46,20 +46,15 @@ export default function PenggunaPage() {
     }
   }, []);
 
-  // Handler untuk memulai mode edit
   const handleStartEdit = useCallback((user) => {
     setEditingUser(user);
-    // Scroll ke atas agar form terlihat
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // Handler untuk menyimpan perubahan edit
   const handleEditUser = useCallback(async (id, formData) => {
     const result = await updateUser(id, formData);
     if (result.success) {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === id ? result.data : u))
-      );
+      await loadUsers();
       setEditingUser(null);
       setToast({ message: "Data pengguna berhasil diperbarui!", type: "success" });
       return true;
@@ -69,7 +64,6 @@ export default function PenggunaPage() {
     }
   }, []);
 
-  // Handler untuk membatalkan edit
   const handleCancelEdit = useCallback(() => {
     setEditingUser(null);
   }, []);
@@ -92,7 +86,7 @@ export default function PenggunaPage() {
         </div>
       </div>
 
-      {/* FORM INPUT (juga untuk edit) */}
+      {/* FORM INPUT */}
       <UserForm
         onAddUser={handleAddUser}
         editingUser={editingUser}

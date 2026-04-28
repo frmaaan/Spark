@@ -8,10 +8,8 @@ export default function UserForm({ onAddUser, editingUser, onEditUser, onCancelE
   const [nip, setNip] = useState("");
   const [nama, setNama] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
   const isEditing = !!editingUser;
 
-  // Saat editingUser berubah, isi form dengan data user yang akan diedit
   useEffect(() => {
     if (editingUser) {
       setNomorFinger(editingUser.nomorFinger || "");
@@ -61,11 +59,9 @@ export default function UserForm({ onAddUser, editingUser, onEditUser, onCancelE
 
   return (
     <div
-      className={`bg-white border-2 border-primary shadow-[4px_4px_0px_0px_#111827] rounded-2xl p-8 animate-fade-in-up ${isEditing ? "ring-2 ring-yellow-400" : ""
-        }`}
+      className={`bg-white border-2 border-primary shadow-[4px_4px_0px_0px_#111827] rounded-2xl p-8 animate-fade-in-up ${isEditing ? "ring-2 ring-yellow-400" : ""}`}
       style={{ animationDelay: "0.05s" }}
     >
-      {/* Card Header */}
       <div className="flex items-center justify-between mb-4">
         <p className="brutal-label">
           {isEditing ? "MODE EDIT DATA" : "FORMULIR INPUT DATA"}
@@ -83,13 +79,9 @@ export default function UserForm({ onAddUser, editingUser, onEditUser, onCancelE
       </h2>
 
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          {/* Nomor Finger */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
           <div>
-            <label
-              htmlFor="nomorFinger"
-              className="brutal-label block mb-2"
-            >
+            <label htmlFor="nomorFinger" className="brutal-label block mb-2">
               NOMOR FINGER
             </label>
             <input
@@ -99,12 +91,11 @@ export default function UserForm({ onAddUser, editingUser, onEditUser, onCancelE
               value={nomorFinger}
               onChange={(e) => setNomorFinger(e.target.value)}
               placeholder="Contoh: 001"
-              className="neu-input"
+              className="neu-input w-full"
               required
             />
           </div>
 
-          {/* NIP/NIK */}
           <div>
             <label htmlFor="nip" className="brutal-label block mb-2">
               NIP / NIK
@@ -116,12 +107,11 @@ export default function UserForm({ onAddUser, editingUser, onEditUser, onCancelE
               value={nip}
               onChange={(e) => setNip(e.target.value)}
               placeholder="Contoh: 1234567890"
-              className="neu-input"
+              className="neu-input w-full"
               required
             />
           </div>
 
-          {/* Nama */}
           <div>
             <label htmlFor="nama" className="brutal-label block mb-2">
               NAMA LENGKAP
@@ -133,7 +123,7 @@ export default function UserForm({ onAddUser, editingUser, onEditUser, onCancelE
               value={nama}
               onChange={(e) => setNama(e.target.value)}
               placeholder="Contoh: Lionel Messi"
-              className="neu-input"
+              className="neu-input w-full"
               required
             />
           </div>
@@ -144,8 +134,7 @@ export default function UserForm({ onAddUser, editingUser, onEditUser, onCancelE
             type="submit"
             disabled={!isFormValid || submitting}
             id={isEditing ? "btn-update-user" : "btn-add-user"}
-            className={`neu-btn ${isEditing ? "neu-btn-success" : "neu-btn-primary"} ${!isFormValid || submitting ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+            className={`neu-btn ${isEditing ? "neu-btn-success" : "neu-btn-primary"} ${!isFormValid || submitting ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             {submitting ? (
               <>
