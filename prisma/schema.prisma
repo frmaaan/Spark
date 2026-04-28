@@ -120,7 +120,12 @@ model Account {
   role      String   @default("USER") // "ADMIN" atau "USER"
   createdAt DateTime @default(now()) @map("created_at")
 
+  teamId Int? @map("team_id")
+  team   Team? @relation(fields: [teamId], references: [id],onDelete: Cascade)
+
   spkls     Spkl[]
+  todos     Todo[]
+
 
   @@map("accounts")
 }
@@ -133,4 +138,39 @@ model Setting {
   value String
 
   @@map("settings")
+}
+
+
+// =============================================================
+// MODEL: Team (Tabel Tim Kolaborasi)
+// =============================================================
+model Team {
+  id        Int       @id @default(autoincrement())
+  nama      String    @unique // contoh: "Tim IT", "Tim Gudang"
+
+  accounts  Account[] // Berubah jadi jamak (accounts)
+  todos     Todo[]
+
+  @@map("teams")
+}
+
+// =============================================================
+// MODEL: Todo (Tabel To-Do List)
+// =============================================================
+model Todo {
+  id        Int       @id @default(autoincrement())
+  task      String    // Diubah dari 'nama' menjadi 'task'
+  description String?  @db.Text
+  isDone    Boolean   @default(false)
+  tipe      String    @default("PERSONAL") // "PERSONAL" | "TEAM"
+  
+  authorId  Int       @map("author_id") // Huruf kecil
+  author    Account   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  teamId    Int?      @map("team_id")
+  team      Team?     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("todos")
 }
