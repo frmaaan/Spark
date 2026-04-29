@@ -402,7 +402,8 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
     setUsingTemplate(templateId);
     const result = await useTemplate(templateId, isTeamTask);
     if (result.success) {
-      setReportTitle(result.title || "Task Report");
+      const templateTitle = (result.title || "Task Report").trim();
+      setReportTitle(templateTitle);
       setShowTemplateModal(false);
     }
     setUsingTemplate(null);
@@ -625,6 +626,7 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
                       await handleRefreshHistories();
                     }
                     clearBoardLocal();
+                    setReportTitle("");
                     shareToWhatsApp(todos, userName, effectiveReportTitle);
                   } catch (err) {
                     // ignore
