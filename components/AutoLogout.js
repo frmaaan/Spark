@@ -4,18 +4,18 @@ import { useEffect, useCallback, useRef } from "react";
 import { logout } from "@/lib/auth";
 
 // 10 menit = 10 * 60 * 1000 = 600000 ms
-const INACTIVITY_LIMIT = 600000; 
+const INACTIVITY_LIMIT = 900000;
 
 export default function AutoLogout() {
   const timeoutRef = useRef(null);
 
   const resetTimer = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    
+
     timeoutRef.current = setTimeout(async () => {
       // Waktu habis, logout otomatis
       await logout();
-      window.location.href = "/login?error=" + encodeURIComponent("Sesi berakhir karena tidak ada aktivitas selama 10 menit.");
+      window.location.href = "/login?error=" + encodeURIComponent("Sesi berakhir karena tidak ada aktivitas selama 15 menit.");
     }, INACTIVITY_LIMIT);
   }, []);
 

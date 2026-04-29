@@ -189,3 +189,17 @@ model TodoTemplate {
 
   @@map("todo_templates")
 }
+
+// =============================================================
+// MODEL: TodoHistory (Snapshot dari sebuah periode, disimpan saat midnight)
+// =============================================================
+model TodoHistory {
+  id        Int      @id @default(autoincrement())
+  title     String   // Judul snapshot, mis. "Snapshot 2026-04-29"
+  items     String   @db.Text // JSON array of todo objects
+  authorId  Int?     @map("author_id")
+  teamId    Int?     @map("team_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("todo_histories")
+}

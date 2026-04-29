@@ -13,8 +13,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({
     app_name: "StacX SPKL",
     donation_enabled: "true",
-    account_1: "BCA: 123456789 A/N Budi",
-    account_2: "DANA: 08123456789 A/N Budi",
+    account_1: "BCA: 6949598182 A/N Firman Nugraha",
+    account_2: "DANA: 0895376523887 A/N Firman",
     donation_text: "",
   });
 

@@ -2,12 +2,14 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { 
-  CheckCircle2, Circle, Trash2, Plus, Users, User, Loader2, 
+import { useRouter } from "next/navigation";
+import {
+  CheckCircle2, Circle, Trash2, Plus, Users, User, Loader2,
   Share2, RefreshCcw, AlignLeft, List, KanbanSquare,
-  ArrowRight, ArrowLeft, PlayCircle, ClipboardList, X, MessageCircle
+  ArrowRight, ArrowLeft, PlayCircle, ClipboardList, X, MessageCircle, Pencil
 } from "lucide-react";
-import { addTodo, updateTodoStatus, deleteTodo, shareTodo, unshareTodo } from "@/lib/actions/todoActions";
+import { addTodo, updateTodoStatus, deleteTodo, shareTodo, unshareTodo, archiveOldTodos, getHistories, updateHistory, deleteHistory, saveHistoryAndClearTodos } from "@/lib/actions/todoActions";
+import ConfirmModal from "@/components/ConfirmModal";
 import { getTemplates, useTemplate } from "@/lib/actions/templateActions";
 
 // Status config — warna senada dengan design system (monokrom + aksen)
@@ -22,7 +24,7 @@ const STATUS_CONFIG = {
     count: "bg-zinc-200 text-text-dark border-zinc-300",
     textColor: "text-text-muted",
     emptyText: "Tidak ada tugas baru",
-    emoji: "⬜",
+    emoji: "❌",
   },
   IN_PROGRESS: {
     label: "IN PROGRESS",
@@ -52,6 +54,14 @@ const STATUS_CONFIG = {
 
 const STATUS_FLOW = ["TODO", "IN_PROGRESS", "DONE"];
 
+function normalizeTodoStatus(value) {
+  const raw = String(value || "").toUpperCase().trim();
+  if (raw === "TODO" || raw === "TO_DO") return "TODO";
+  if (raw === "IN_PROGRESS" || raw === "INPROGRESS" || raw === "PROGRESS") return "IN_PROGRESS";
+  if (raw === "DONE" || raw === "SELESAI" || raw === "FINISH" || raw === "FINISHED") return "DONE";
+  return "TODO";
+}
+
 function getNextStatus(current) {
   const idx = STATUS_FLOW.indexOf(current);
   return idx < STATUS_FLOW.length - 1 ? STATUS_FLOW[idx + 1] : null;
@@ -76,14 +86,32 @@ function StatusBadge({ status }) {
 // ============================
 // TASK CARD
 // ============================
-function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition, compact = false }) {
+function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition, compact = false, draggable = false, onDragStart, onDragEnd, isDragging = false, onChangeStatus }) {
   const next = getNextStatus(todo.status);
   const prev = getPrevStatus(todo.status);
 
   return (
-    <div className={`p-3 border-2 rounded-[6px] transition-all group ${todo.status === "DONE" ? "bg-zinc-50 border-zinc-200 opacity-70" : "bg-white border-primary-light hover:border-primary"}`}>
+    <div
+      draggable={draggable}
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", String(todo.id));
+        onDragStart?.(event);
+      }}
+      onDragEnd={onDragEnd}
+      className={`p-3 border-2 rounded-[6px] transition-all group ${todo.status === "DONE" ? "bg-zinc-50 border-zinc-200 opacity-70" : "bg-white border-primary-light hover:border-primary"} ${draggable ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-50 ring-2 ring-primary" : ""}`}
+    >
       <div className="flex items-start gap-2">
-        <div className="mt-0.5 flex-shrink-0">
+        <button
+          className="mt-0.5 flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
+          disabled={isPending}
+          onClick={() => {
+            // Klik ikon: maju ke status berikutnya, atau kembali ke TODO jika sudah DONE
+            const target = todo.status === "DONE" ? "TODO" : (next || "TODO");
+            onChangeStatus?.(todo.id, target);
+          }}
+          title={todo.status === "DONE" ? "Buka Kembali" : `Pindah ke ${STATUS_CONFIG[next || "TODO"].label}`}
+        >
           {todo.status === "DONE" ? (
             <CheckCircle2 size={16} className="text-success" />
           ) : todo.status === "IN_PROGRESS" ? (
@@ -91,7 +119,7 @@ function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition,
           ) : (
             <Circle size={16} className="text-text-light" />
           )}
-        </div>
+        </button>
 
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-semibold leading-tight ${todo.status === "DONE" ? "line-through text-text-muted" : "text-text-dark"}`}>
@@ -117,12 +145,12 @@ function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition,
 
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           {prev && (
-            <button onClick={() => startTransition(() => updateTodoStatus(todo.id, prev))} disabled={isPending} title={`← ${STATUS_CONFIG[prev].label}`} className="text-text-light hover:text-text-dark transition-colors p-1 hover:bg-surface-light rounded">
+            <button onClick={() => onChangeStatus?.(todo.id, prev)} disabled={isPending} title={`← ${STATUS_CONFIG[prev].label}`} className="text-text-light hover:text-text-dark transition-colors p-1 hover:bg-surface-light rounded">
               <ArrowLeft size={13} />
             </button>
           )}
           {next && (
-            <button onClick={() => startTransition(() => updateTodoStatus(todo.id, next))} disabled={isPending} title={`→ ${STATUS_CONFIG[next].label}`} className="text-text-light hover:text-primary transition-colors p-1 hover:bg-surface-light rounded">
+            <button onClick={() => onChangeStatus?.(todo.id, next)} disabled={isPending} title={`→ ${STATUS_CONFIG[next].label}`} className="text-text-light hover:text-primary transition-colors p-1 hover:bg-surface-light rounded">
               <ArrowRight size={13} />
             </button>
           )}
@@ -150,10 +178,20 @@ function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition,
 // ============================
 // KANBAN COLUMN
 // ============================
-function KanbanColumn({ statusKey, todos, currentUserId, userTeamId, isPending, startTransition }) {
+function KanbanColumn({ statusKey, todos, currentUserId, userTeamId, isPending, startTransition, onChangeStatus, isDraggingOver = false, onDragOver, onDrop, draggedTodoId, onCardDragStart, onCardDragEnd }) {
   const cfg = STATUS_CONFIG[statusKey];
   return (
-    <div className={`${cfg.bg} border-2 ${cfg.border} rounded-[8px] p-3 flex flex-col`}>
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver?.();
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop?.();
+      }}
+      className={`${cfg.bg} border-2 ${cfg.border} rounded-[8px] p-3 flex flex-col transition-all ${isDraggingOver ? "ring-2 ring-primary shadow-[4px_4px_0px_0px_#111827]" : ""}`}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${cfg.dot} border ${cfg.dotBorder}`}></div>
@@ -168,7 +206,20 @@ function KanbanColumn({ statusKey, todos, currentUserId, userTeamId, isPending, 
           <p className={`text-[11px] ${cfg.textColor} text-center py-8 italic`}>{cfg.emptyText}</p>
         ) : (
           todos.map((todo) => (
-            <TaskCard key={todo.id} todo={todo} currentUserId={currentUserId} userTeamId={userTeamId} isPending={isPending} startTransition={startTransition} compact />
+            <TaskCard
+              key={todo.id}
+              todo={todo}
+              currentUserId={currentUserId}
+              userTeamId={userTeamId}
+              isPending={isPending}
+              startTransition={startTransition}
+              compact
+              draggable
+              isDragging={draggedTodoId === todo.id}
+              onDragStart={() => onCardDragStart?.(todo)}
+              onDragEnd={onCardDragEnd}
+              onChangeStatus={onChangeStatus}
+            />
           ))
         )}
       </div>
@@ -179,57 +230,153 @@ function KanbanColumn({ statusKey, todos, currentUserId, userTeamId, isPending, 
 // ============================
 // WHATSAPP SHARE HELPER
 // ============================
-function generateWhatsAppText(todos, userName) {
+function generateWhatsAppText(todos, userName, reportTitle = "Task Report") {
   if (todos.length === 0) return "";
 
-  const total = todos.length;
-  const done = todos.filter(t => t.status === "DONE").length;
-  const inProgress = todos.filter(t => t.status === "IN_PROGRESS").length;
-
-  let text = `📋 *Task Report*\n`;
+  let text = ` *${reportTitle}*\n`;
   text += `━━━━━━━━━━━━━━━━━━\n`;
 
   todos.forEach((todo) => {
-    const emoji = STATUS_CONFIG[todo.status].emoji;
+    const emoji = todo.status === "DONE" ? "✅" : todo.status === "TODO" ? "❌" : "🔄";
     text += `${emoji} ${todo.task}\n`;
   });
 
   text += `━━━━━━━━━━━━━━━━━━\n`;
-  text += `📊 *Progress: ${done}/${total} selesai*`;
-  if (inProgress > 0) text += ` | 🔄 ${inProgress} in progress`;
-  text += `\n👤 Oleh: ${userName}`;
+ // const total = todos.length;
+ // const done = todos.filter(t => t.status === "DONE").length;
+ // const inProgress = todos.filter(t => t.status === "IN_PROGRESS").length;
+ // text += `📊 *Progress: ${done}/${total} selesai*`;
+ // if (inProgress > 0) text += ` | 🔄 ${inProgress} in progress`;
+ // text += `\n👤 Oleh: ${userName}`;
 
   return text;
 }
 
-function shareToWhatsApp(todos, userName) {
-  const text = generateWhatsAppText(todos, userName);
+function shareToWhatsApp(todos, userName, reportTitle) {
+  const text = generateWhatsAppText(todos, userName, reportTitle);
   const encoded = encodeURIComponent(text);
-  window.open(`https://wa.me/?text=${encoded}`, "_blank");
+  const isDesktop = typeof window !== "undefined" && window.matchMedia?.("(min-width: 768px)").matches;
+  const url = isDesktop
+    ? `https://web.whatsapp.com/send?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+  window.open(url, "_blank");
 }
 
 // ============================
 // MAIN COMPONENT
 // ============================
 export default function TaskManager({ initialTodos = [], userTeamId, currentUserId, userName = "User" }) {
+  const router = useRouter();
   const [view, setView] = useState("board");
   const [task, setTask] = useState("");
   const [description, setDescription] = useState("");
   const [showDesc, setShowDesc] = useState(false);
   const [isTeamTask, setIsTeamTask] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [todos, setTodos] = useState(initialTodos);
+  const [draggedTodoId, setDraggedTodoId] = useState(null);
+  const [draggedTodoStatus, setDraggedTodoStatus] = useState(null);
+  const [dragOverStatus, setDragOverStatus] = useState(null);
 
   // Template modal
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [usingTemplate, setUsingTemplate] = useState(null); // template id
+  const [reportTitle, setReportTitle] = useState("Task Report");
+  const [histories, setHistories] = useState([]);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  const [editingHistory, setEditingHistory] = useState(null); // { id, title, items }
+  const [historyEditBackup, setHistoryEditBackup] = useState(null);
+  const [showSaveBeforeShareModal, setShowSaveBeforeShareModal] = useState(false);
+  const [saveBeforeShareLoading, setSaveBeforeShareLoading] = useState(false);
+  const [showDeleteHistoryModal, setShowDeleteHistoryModal] = useState(false);
+  const [historyIdToDelete, setHistoryIdToDelete] = useState(null);
+
+  const effectiveReportTitle = (reportTitle || "").trim() || "Task Report";
+
+  useEffect(() => {
+    setTodos(initialTodos);
+  }, [initialTodos]);
+
+  // On mount: archive old todos (once) and load histories
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await archiveOldTodos();
+      } catch (err) {
+        // ignore
+      }
+      try {
+        const res = await getHistories();
+        if (mounted && res.success) setHistories(res.data || []);
+      } catch (err) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    const storedTitle = window.sessionStorage.getItem("stacx_report_title");
+    if (storedTitle && storedTitle.trim()) {
+      setReportTitle(storedTitle.trim());
+    }
+  }, []);
+
+  useEffect(() => {
+    const normalized = (reportTitle || "").trim();
+    if (!normalized) {
+      window.sessionStorage.removeItem("stacx_report_title");
+      return;
+    }
+    window.sessionStorage.setItem("stacx_report_title", normalized);
+  }, [reportTitle]);
+
+  async function handleMoveTodoStatus(todoId, newStatus) {
+    // Saat edit histori, perubahan status cukup lokal (tidak update tabel todo aktif)
+    if (editingHistory) {
+      setTodos((prev) => prev.map((todo) => (todo.id === todoId ? { ...todo, status: normalizeTodoStatus(newStatus) } : todo)));
+      return;
+    }
+
+    const previousTodos = todos;
+    setTodos((prev) => prev.map((todo) => (todo.id === todoId ? { ...todo, status: normalizeTodoStatus(newStatus) } : todo)));
+
+    const result = await updateTodoStatus(todoId, normalizeTodoStatus(newStatus));
+    if (!result.success) {
+      setTodos(previousTodos);
+      return;
+    }
+
+    router.refresh();
+  }
+
+  function handleDragStart(todo) {
+    setDraggedTodoId(todo.id);
+    setDraggedTodoStatus(todo.status);
+  }
+
+  function handleDragEnd() {
+    setDraggedTodoId(null);
+    setDraggedTodoStatus(null);
+    setDragOverStatus(null);
+  }
+
+  function handleDropOnStatus(statusKey) {
+    if (draggedTodoId === null) return;
+    if (draggedTodoStatus !== statusKey) {
+      handleMoveTodoStatus(draggedTodoId, statusKey);
+    }
+    handleDragEnd();
+  }
 
   // Group by status
   const todosByStatus = {
-    TODO: initialTodos.filter(t => t.status === "TODO"),
-    IN_PROGRESS: initialTodos.filter(t => t.status === "IN_PROGRESS"),
-    DONE: initialTodos.filter(t => t.status === "DONE"),
+    TODO: todos.filter(t => t.status === "TODO"),
+    IN_PROGRESS: todos.filter(t => t.status === "IN_PROGRESS"),
+    DONE: todos.filter(t => t.status === "DONE"),
   };
 
   async function handleAdd(e) {
@@ -255,9 +402,84 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
     setUsingTemplate(templateId);
     const result = await useTemplate(templateId, isTeamTask);
     if (result.success) {
+      setReportTitle(result.title || "Task Report");
       setShowTemplateModal(false);
     }
     setUsingTemplate(null);
+  }
+
+  // History handlers
+  function openHistoryPanel() {
+    setShowHistoryPanel(true);
+  }
+
+  async function handleRefreshHistories() {
+    const res = await getHistories();
+    if (res.success) setHistories(res.data || []);
+  }
+
+  function clearBoardLocal() {
+    setTodos([]);
+    setTask("");
+    setDescription("");
+    setShowDesc(false);
+  }
+
+  function handleEditHistoryClick(history) {
+    // Warn if current board has content
+    if (todos.length > 0) {
+      const ok = window.confirm("Terdapat Kanban/ToDo baru — jika lanjut, board saat ini akan hilang. Lanjutkan?");
+      if (!ok) return;
+    }
+
+    // load history items into board for editing
+    const items = JSON.parse(history.items || "[]");
+    // map to todo-like objects (no DB ids)
+    const mapped = items.map((it, idx) => ({ id: `hist-${history.id}-${idx}`, task: it.task, description: it.description || "", status: normalizeTodoStatus(it.status), tipe: it.tipe || "PERSONAL", authorId: it.authorId || null }));
+    setHistoryEditBackup(todos);
+    setTodos(mapped);
+    setEditingHistory({ id: history.id, title: history.title });
+    setShowHistoryPanel(false);
+    setView("board");
+  }
+
+  async function handleSaveHistoryEdits(newTitle, newItems) {
+    if (!editingHistory) return;
+    startTransition(async () => {
+      await updateHistory(editingHistory.id, newTitle, newItems);
+      setEditingHistory(null);
+      setHistoryEditBackup(null);
+      await handleRefreshHistories();
+    });
+  }
+
+  function handleCancelHistoryEdit() {
+    if (historyEditBackup) {
+      setTodos(historyEditBackup);
+    }
+    setHistoryEditBackup(null);
+    setEditingHistory(null);
+  }
+
+  function handleDeleteHistory(id) {
+    setHistoryIdToDelete(id);
+    setShowDeleteHistoryModal(true);
+  }
+
+  async function handleConfirmDeleteHistory() {
+    if (!historyIdToDelete) return;
+    const res = await deleteHistory(historyIdToDelete);
+    if (res.success) {
+      await handleRefreshHistories();
+    }
+    setShowDeleteHistoryModal(false);
+    setHistoryIdToDelete(null);
+  }
+
+  function handleShareHistory(history) {
+    const items = JSON.parse(history.items || "[]");
+    const fakeTodos = items.map(it => ({ task: it.task, status: it.status }));
+    shareToWhatsApp(fakeTodos, userName, (history.title || "").trim() || effectiveReportTitle);
   }
 
   return (
@@ -290,6 +512,38 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
       </div>
 
       <div className="border-t-2 border-dashed border-primary-light pt-5">
+        {editingHistory && (
+          <div className="mb-4 bg-yellow-50 border-2 border-yellow-300 rounded-[6px] p-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-wider text-yellow-800">MODE EDIT HISTORI AKTIF</p>
+              <p className="text-xs text-yellow-700 mt-1">Snapshot histori sudah dimuat ke board. Edit langsung di kanban/list, lalu simpan kembali ke histori.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
+              <input
+                type="text"
+                value={editingHistory.title}
+                onChange={(e) => setEditingHistory((prev) => ({ ...prev, title: e.target.value }))}
+                className="min-w-[220px] border-2 border-yellow-400 rounded-[4px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
+              />
+              <button
+                onClick={() => {
+                  const itemsToSave = todos.map((t) => ({ task: t.task, description: t.description || "", status: t.status, tipe: t.tipe || "PERSONAL", authorId: t.authorId || null }));
+                  handleSaveHistoryEdits(editingHistory.title || `Snapshot ${new Date().toISOString().slice(0,10)}`, itemsToSave);
+                }}
+                className="px-3 py-2 bg-primary text-white border-2 border-text-dark text-[11px] font-black uppercase"
+              >
+                Simpan Histori
+              </button>
+              <button
+                onClick={handleCancelHistoryEdit}
+                className="px-3 py-2 bg-zinc-200 text-black border-2 border-black text-[11px] font-black uppercase"
+              >
+                Batal Edit
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Form Tambah */}
         <form onSubmit={handleAdd} className="mb-4 bg-surface-light p-3 border-2 border-primary-light rounded-[6px]">
           <div className="flex gap-2">
@@ -339,24 +593,82 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
           >
             <ClipboardList size={13} /> GUNAKAN TEMPLATE
           </button>
-          {initialTodos.length > 0 && (
-            <button
-              onClick={() => shareToWhatsApp(initialTodos, userName)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider bg-surface-light border-2 border-primary rounded-[4px] hover:bg-green-600 hover:text-white hover:border-green-600 transition-colors shadow-[2px_2px_0px_0px_#111827] active:translate-y-[1px] active:shadow-none"
-            >
-              <MessageCircle size={13} /> SHARE WHATSAPP
-            </button>
+          {todos.length > 0 && (
+            <>
+              <button
+                onClick={() => setShowSaveBeforeShareModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider bg-surface-light border-2 border-primary rounded-[4px] hover:bg-green-600 hover:text-white hover:border-green-600 transition-colors shadow-[2px_2px_0px_0px_#111827] active:translate-y-[1px] active:shadow-none"
+              >
+                <MessageCircle size={13} /> SHARE WHATSAPP
+              </button>
+
+              <ConfirmModal
+                isOpen={showSaveBeforeShareModal}
+                title="Simpan ke Histori sebelum Share?"
+                message={"Pilih 'Simpan & Bagikan' untuk menyimpan snapshot saat ini ke histori, atau pilih 'Bagikan tanpa menyimpan' untuk langsung membagikan."}
+                onCancel={async () => {
+                  // Share without saving
+                  setShowSaveBeforeShareModal(false);
+                  shareToWhatsApp(todos, userName, effectiveReportTitle);
+                }}
+                onConfirm={async () => {
+                  setSaveBeforeShareLoading(true);
+                  try {
+                    const result = await saveHistoryAndClearTodos(effectiveReportTitle || `Snapshot ${new Date().toISOString().slice(0,10)}`, todos);
+                    if (!result?.success) {
+                      window.alert(result?.error || "Gagal menyimpan histori.");
+                      return;
+                    }
+                    if (result.data) {
+                      setHistories((prev) => [result.data, ...prev]);
+                    } else {
+                      await handleRefreshHistories();
+                    }
+                    clearBoardLocal();
+                    shareToWhatsApp(todos, userName, effectiveReportTitle);
+                  } catch (err) {
+                    // ignore
+                  } finally {
+                    setSaveBeforeShareLoading(false);
+                    setShowSaveBeforeShareModal(false);
+                  }
+                }}
+                confirmText={saveBeforeShareLoading ? 'Menyimpan...' : 'Simpan & Bagikan'}
+                cancelText="Bagikan tanpa menyimpan"
+                type="primary"
+              />
+            </>
           )}
+          <button
+            onClick={openHistoryPanel}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider bg-surface-light border-2 border-primary rounded-[4px] hover:bg-surface hover:text-white transition-colors shadow-[2px_2px_0px_0px_#111827] active:translate-y-[1px] active:shadow-none"
+          >
+            <List size={13} /> HISTORY
+          </button>
+        </div>
+
+        <div className="mb-5 bg-surface-light border-2 border-primary rounded-[6px] p-3">
+          <label className="block text-[11px] font-black uppercase tracking-wider text-text-dark mb-2">
+            Judul TodoList / Kanban
+          </label>
+          <input
+            type="text"
+            value={reportTitle}
+            onChange={(e) => setReportTitle(e.target.value)}
+            className="w-full border-2 border-primary rounded-[4px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+            placeholder="Task Report"
+          />
+          <p className="text-[10px] text-text-muted mt-2">Jika dikosongkan, judul otomatis menggunakan <span className="font-bold">Task Report</span>.</p>
         </div>
 
         {/* ===== VIEW: LIST ===== */}
         {view === "list" && (
           <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-            {initialTodos.length === 0 ? (
+            {todos.length === 0 ? (
               <p className="text-sm text-text-muted text-center py-8 italic">Belum ada tugas saat ini.</p>
             ) : (
-              initialTodos.map((todo) => (
-                <TaskCard key={todo.id} todo={todo} currentUserId={currentUserId} userTeamId={userTeamId} isPending={isPending} startTransition={startTransition} />
+              todos.map((todo) => (
+                <TaskCard key={todo.id} todo={todo} currentUserId={currentUserId} userTeamId={userTeamId} isPending={isPending} startTransition={startTransition} draggable={false} onChangeStatus={handleMoveTodoStatus} />
               ))
             )}
           </div>
@@ -374,6 +686,13 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
                 userTeamId={userTeamId}
                 isPending={isPending}
                 startTransition={startTransition}
+                onChangeStatus={handleMoveTodoStatus}
+                isDraggingOver={dragOverStatus === statusKey}
+                onDragOver={() => setDragOverStatus(statusKey)}
+                onDrop={() => handleDropOnStatus(statusKey)}
+                draggedTodoId={draggedTodoId}
+                onCardDragStart={handleDragStart}
+                onCardDragEnd={handleDragEnd}
               />
             ))}
           </div>
@@ -381,6 +700,92 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
       </div>
 
       {/* ===== MODAL: PILIH TEMPLATE ===== */}
+      {/* ===== PANEL: HISTORY ===== */}
+      {showHistoryPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border-[4px] border-black shadow-[8px_8px_0px_0px_#111827] p-6 max-w-2xl w-full animate-fade-in-up max-h-[84vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b-[3px] border-black pb-3 mb-4">
+              <div>
+                <h3 className="font-black text-lg uppercase tracking-tight">Histori ToDo / Kanban</h3>
+                <p className="text-[11px] text-text-muted mt-1">Snapshot tersimpan yang bisa diedit atau langsung dibagikan.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={handleRefreshHistories} className="px-3 py-1.5 border-2 border-black bg-zinc-100 text-[11px] font-black uppercase hover:bg-zinc-200">Refresh</button>
+                <button onClick={() => setShowHistoryPanel(false)} className="px-3 py-1.5 border-2 border-black bg-white text-[11px] font-black uppercase hover:bg-zinc-100">Tutup</button>
+              </div>
+            </div>
+
+            {histories.length === 0 ? (
+              <div className="py-12 text-center text-text-muted border-2 border-dashed border-primary-light rounded-[8px]">Belum ada histori.</div>
+            ) : (
+              <div className="space-y-3">
+                {histories.map(h => {
+                  const items = JSON.parse(h.items || "[]");
+                  const todoCount = items.filter((i) => normalizeTodoStatus(i.status) === "TODO").length;
+                  const progressCount = items.filter((i) => normalizeTodoStatus(i.status) === "IN_PROGRESS").length;
+                  const doneCount = items.filter((i) => normalizeTodoStatus(i.status) === "DONE").length;
+
+                  return (
+                  <div key={h.id} className="p-4 border-2 border-primary rounded-[8px] bg-surface-light shadow-[3px_3px_0px_0px_#111827] hover:bg-white hover:shadow-[4px_4px_0px_0px_#111827] transition-all active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#111827]">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black text-sm uppercase tracking-wide text-text-dark truncate">{h.title || "Task Report"}</p>
+                        <p className="text-[11px] text-text-muted mt-1">{new Date(h.createdAt).toLocaleString()}</p>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className="text-[10px] font-black px-2 py-1 border rounded bg-zinc-200 border-zinc-300">TODO: {todoCount}</span>
+                          <span className="text-[10px] font-black px-2 py-1 border rounded bg-yellow-100 border-yellow-300">PROGRESS: {progressCount}</span>
+                          <span className="text-[10px] font-black px-2 py-1 border rounded bg-green-100 border-green-300">DONE: {doneCount}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap md:justify-end">
+                        <button
+                          onClick={() => handleEditHistoryClick(h)}
+                          title="Edit histori"
+                          aria-label="Edit histori"
+                          className="w-9 h-9 flex items-center justify-center border-2 border-black bg-primary text-white rounded-[4px] shadow-[2px_2px_0px_0px_#111827] hover:brightness-110 transition-all active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#111827]"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleShareHistory(h)}
+                          title="Share WhatsApp"
+                          aria-label="Share WhatsApp"
+                          className="w-9 h-9 flex items-center justify-center border-2 border-black bg-green-600 text-white rounded-[4px] shadow-[2px_2px_0px_0px_#111827] hover:bg-green-700 transition-all active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#111827]"
+                        >
+                          <MessageCircle size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteHistory(h.id)}
+                          title="Hapus histori"
+                          aria-label="Hapus histori"
+                          className="w-9 h-9 flex items-center justify-center border-2 border-black bg-red-500 text-white rounded-[4px] shadow-[2px_2px_0px_0px_#111827] hover:bg-red-600 transition-all active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#111827]"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )})}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        isOpen={showDeleteHistoryModal}
+        title="Hapus Histori?"
+        message="Histori yang dihapus tidak dapat dikembalikan."
+        onConfirm={handleConfirmDeleteHistory}
+        onCancel={() => {
+          setShowDeleteHistoryModal(false);
+          setHistoryIdToDelete(null);
+        }}
+        confirmText="Hapus"
+        cancelText="Batal"
+        type="danger"
+      />
+
       {showTemplateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white border-[4px] border-black shadow-[8px_8px_0px_0px_#111827] p-6 max-w-md w-full animate-fade-in-up max-h-[80vh] overflow-y-auto">
