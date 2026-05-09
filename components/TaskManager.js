@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   CheckCircle2, Circle, Trash2, Plus, Users, User, Loader2,
   Share2, RefreshCcw, AlignLeft, List, KanbanSquare,
-  ArrowRight, ArrowLeft, PlayCircle, ClipboardList, X, MessageCircle, Pencil
+  ArrowRight, ArrowLeft, PlayCircle, ClipboardList, X, MessageCircle, Pencil, Save
 } from "lucide-react";
 import { addTodo, updateTodoStatus, deleteTodo, shareTodo, unshareTodo, archiveOldTodos, getHistories, updateHistory, deleteHistory, saveHistoryAndClearTodos } from "@/lib/actions/todoActions";
 import ConfirmModal from "@/components/ConfirmModal";
-import { getTemplates, useTemplate } from "@/lib/actions/templateActions";
+// Import updateTemplate & deleteTemplate ditambahkan di sini
+import { getTemplates, useTemplate, addTemplate, updateTemplate, deleteTemplate } from "@/lib/actions/templateActions";
 
 // Status config — warna senada dengan design system (monokrom + aksen)
 const STATUS_CONFIG = {
@@ -52,7 +53,8 @@ const STATUS_CONFIG = {
   },
 };
 
-const STATUS_FLOW = ["TODO", "IN_PROGRESS", "DONE"];
+const BOARD_STATUS_FLOW = ["TODO", "IN_PROGRESS", "DONE"];
+const LIST_STATUS_FLOW = ["TODO", "DONE"];
 
 function normalizeTodoStatus(value) {
   const raw = String(value || "").toUpperCase().trim();
@@ -62,13 +64,16 @@ function normalizeTodoStatus(value) {
   return "TODO";
 }
 
-function getNextStatus(current) {
-  const idx = STATUS_FLOW.indexOf(current);
-  return idx < STATUS_FLOW.length - 1 ? STATUS_FLOW[idx + 1] : null;
+function getNextStatus(current, flow) {
+  if (current === "IN_PROGRESS" && !flow.includes("IN_PROGRESS")) return "DONE";
+  const idx = flow.indexOf(current);
+  return idx >= 0 && idx < flow.length - 1 ? flow[idx + 1] : null;
 }
-function getPrevStatus(current) {
-  const idx = STATUS_FLOW.indexOf(current);
-  return idx > 0 ? STATUS_FLOW[idx - 1] : null;
+
+function getPrevStatus(current, flow) {
+  if (current === "IN_PROGRESS" && !flow.includes("IN_PROGRESS")) return "TODO";
+  const idx = flow.indexOf(current);
+  return idx > 0 ? flow[idx - 1] : null;
 }
 
 // ============================
@@ -86,9 +91,9 @@ function StatusBadge({ status }) {
 // ============================
 // TASK CARD
 // ============================
-function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition, compact = false, draggable = false, onDragStart, onDragEnd, isDragging = false, onChangeStatus }) {
-  const next = getNextStatus(todo.status);
-  const prev = getPrevStatus(todo.status);
+function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition, compact = false, draggable = false, onDragStart, onDragEnd, isDragging = false, onChangeStatus, statusFlow }) {
+  const next = getNextStatus(todo.status, statusFlow);
+  const prev = getPrevStatus(todo.status, statusFlow);
 
   return (
     <div
@@ -106,7 +111,6 @@ function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition,
           className="mt-0.5 flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
           disabled={isPending}
           onClick={() => {
-            // Klik ikon: maju ke status berikutnya, atau kembali ke TODO jika sudah DONE
             const target = todo.status === "DONE" ? "TODO" : (next || "TODO");
             onChangeStatus?.(todo.id, target);
           }}
@@ -178,7 +182,7 @@ function TaskCard({ todo, currentUserId, userTeamId, isPending, startTransition,
 // ============================
 // KANBAN COLUMN
 // ============================
-function KanbanColumn({ statusKey, todos, currentUserId, userTeamId, isPending, startTransition, onChangeStatus, isDraggingOver = false, onDragOver, onDrop, draggedTodoId, onCardDragStart, onCardDragEnd }) {
+function KanbanColumn({ statusKey, todos, currentUserId, userTeamId, isPending, startTransition, onChangeStatus, isDraggingOver = false, onDragOver, onDrop, draggedTodoId, onCardDragStart, onCardDragEnd, statusFlow }) {
   const cfg = STATUS_CONFIG[statusKey];
   return (
     <div
@@ -219,6 +223,7 @@ function KanbanColumn({ statusKey, todos, currentUserId, userTeamId, isPending, 
               onDragStart={() => onCardDragStart?.(todo)}
               onDragEnd={onCardDragEnd}
               onChangeStatus={onChangeStatus}
+              statusFlow={statusFlow}
             />
           ))
         )}
@@ -242,13 +247,6 @@ function generateWhatsAppText(todos, userName, reportTitle = "Task Report") {
   });
 
   text += `━━━━━━━━━━━━━━━━━━\n`;
- // const total = todos.length;
- // const done = todos.filter(t => t.status === "DONE").length;
- // const inProgress = todos.filter(t => t.status === "IN_PROGRESS").length;
- // text += `📊 *Progress: ${done}/${total} selesai*`;
- // if (inProgress > 0) text += ` | 🔄 ${inProgress} in progress`;
- // text += `\n👤 Oleh: ${userName}`;
-
   return text;
 }
 
@@ -278,15 +276,22 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
   const [draggedTodoStatus, setDraggedTodoStatus] = useState(null);
   const [dragOverStatus, setDragOverStatus] = useState(null);
 
-  // Template modal
+  // Template modal & Creation
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
-  const [usingTemplate, setUsingTemplate] = useState(null); // template id
+  const [usingTemplate, setUsingTemplate] = useState(null);
+  const [showCreateTemplateForm, setShowCreateTemplateForm] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState(null); // Mode Edit
+  const [newTemplateTitle, setNewTemplateTitle] = useState("");
+  const [newTemplateItems, setNewTemplateItems] = useState([""]);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+
+  // History & Others
   const [reportTitle, setReportTitle] = useState("Task Report");
   const [histories, setHistories] = useState([]);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
-  const [editingHistory, setEditingHistory] = useState(null); // { id, title, items }
+  const [editingHistory, setEditingHistory] = useState(null);
   const [historyEditBackup, setHistoryEditBackup] = useState(null);
   const [showSaveBeforeShareModal, setShowSaveBeforeShareModal] = useState(false);
   const [saveBeforeShareLoading, setSaveBeforeShareLoading] = useState(false);
@@ -295,34 +300,23 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
 
   const effectiveReportTitle = (reportTitle || "").trim() || "Task Report";
 
-  useEffect(() => {
-    setTodos(initialTodos);
-  }, [initialTodos]);
+  useEffect(() => { setTodos(initialTodos); }, [initialTodos]);
 
-  // On mount: archive old todos (once) and load histories
   useEffect(() => {
     let mounted = true;
     (async () => {
-      try {
-        await archiveOldTodos();
-      } catch (err) {
-        // ignore
-      }
+      try { await archiveOldTodos(); } catch (err) {}
       try {
         const res = await getHistories();
         if (mounted && res.success) setHistories(res.data || []);
-      } catch (err) {
-        // ignore
-      }
+      } catch (err) {}
     })();
     return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     const storedTitle = window.sessionStorage.getItem("stacx_report_title");
-    if (storedTitle && storedTitle.trim()) {
-      setReportTitle(storedTitle.trim());
-    }
+    if (storedTitle && storedTitle.trim()) setReportTitle(storedTitle.trim());
   }, []);
 
   useEffect(() => {
@@ -335,7 +329,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
   }, [reportTitle]);
 
   async function handleMoveTodoStatus(todoId, newStatus) {
-    // Saat edit histori, perubahan status cukup lokal (tidak update tabel todo aktif)
     if (editingHistory) {
       setTodos((prev) => prev.map((todo) => (todo.id === todoId ? { ...todo, status: normalizeTodoStatus(newStatus) } : todo)));
       return;
@@ -349,7 +342,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
       setTodos(previousTodos);
       return;
     }
-
     router.refresh();
   }
 
@@ -366,13 +358,10 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
 
   function handleDropOnStatus(statusKey) {
     if (draggedTodoId === null) return;
-    if (draggedTodoStatus !== statusKey) {
-      handleMoveTodoStatus(draggedTodoId, statusKey);
-    }
+    if (draggedTodoStatus !== statusKey) handleMoveTodoStatus(draggedTodoId, statusKey);
     handleDragEnd();
   }
 
-  // Group by status
   const todosByStatus = {
     TODO: todos.filter(t => t.status === "TODO"),
     IN_PROGRESS: todos.filter(t => t.status === "IN_PROGRESS"),
@@ -390,6 +379,7 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
     });
   }
 
+  // === Modal Template Logic ===
   async function openTemplateModal() {
     setShowTemplateModal(true);
     setLoadingTemplates(true);
@@ -404,38 +394,113 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
     if (result.success) {
       const templateTitle = (result.title || "Task Report").trim();
       setReportTitle(templateTitle);
-      setShowTemplateModal(false);
+      closeTemplateModal();
     }
     setUsingTemplate(null);
   }
 
-  // History handlers
-  function openHistoryPanel() {
-    setShowHistoryPanel(true);
+  function closeTemplateModal() {
+    setShowTemplateModal(false);
+    setShowCreateTemplateForm(false);
+    setEditingTemplateId(null);
+    setNewTemplateTitle("");
+    setNewTemplateItems([""]);
   }
 
+  // === Create & Update Template Logic ===
+  function handleAddTemplateItem() {
+    setNewTemplateItems([...newTemplateItems, ""]);
+  }
+
+  function handleRemoveTemplateItem(index) {
+    setNewTemplateItems(newTemplateItems.filter((_, i) => i !== index));
+  }
+
+  function handleTemplateItemChange(index, val) {
+    const updated = [...newTemplateItems];
+    updated[index] = val;
+    setNewTemplateItems(updated);
+  }
+
+  // Masuk ke Mode Edit Template
+  function handleEditTemplate(tpl) {
+    setEditingTemplateId(tpl.id);
+    setNewTemplateTitle(tpl.title);
+    setNewTemplateItems(tpl.items && tpl.items.length > 0 ? tpl.items : [""]);
+    setShowCreateTemplateForm(true);
+  }
+
+  // Hapus Template
+  async function handleDeleteTemplate(id) {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus template ini?")) return;
+    try {
+      const res = await deleteTemplate(id);
+      if (res.success) {
+        setTemplates(templates.filter(t => t.id !== id));
+      } else {
+        alert(res.error || "Gagal menghapus template. Akses mungkin ditolak.");
+      }
+    } catch (err) {
+      alert("Terjadi kesalahan sistem.");
+    }
+  }
+
+  // Submit Form (Create & Update)
+  async function submitTemplateForm(e) {
+    e.preventDefault();
+    if (!newTemplateTitle.trim()) return;
+    const validItems = newTemplateItems.map(i => i.trim()).filter(Boolean);
+    if (validItems.length === 0) return;
+
+    setIsCreatingTemplate(true);
+    try {
+      let res;
+      if (editingTemplateId) {
+        // Mode Update
+        res = await updateTemplate(editingTemplateId, newTemplateTitle.trim(), validItems);
+      } else {
+        // Mode Create
+        res = await addTemplate(newTemplateTitle.trim(), validItems);
+      }
+
+      if (res.success) {
+        setNewTemplateTitle("");
+        setNewTemplateItems([""]);
+        setEditingTemplateId(null);
+        setShowCreateTemplateForm(false);
+        
+        // Refresh list template
+        setLoadingTemplates(true);
+        const templatesRes = await getTemplates();
+        if (templatesRes.success) setTemplates(templatesRes.data);
+        setLoadingTemplates(false);
+      } else {
+        alert(res.error || "Gagal menyimpan template.");
+      }
+    } catch (error) {
+      alert("Terjadi kesalahan sistem.");
+    } finally {
+      setIsCreatingTemplate(false);
+    }
+  }
+
+  // === History Logic ===
+  function openHistoryPanel() { setShowHistoryPanel(true); }
   async function handleRefreshHistories() {
     const res = await getHistories();
     if (res.success) setHistories(res.data || []);
   }
 
   function clearBoardLocal() {
-    setTodos([]);
-    setTask("");
-    setDescription("");
-    setShowDesc(false);
+    setTodos([]); setTask(""); setDescription(""); setShowDesc(false);
   }
 
   function handleEditHistoryClick(history) {
-    // Warn if current board has content
     if (todos.length > 0) {
       const ok = window.confirm("Terdapat Kanban/ToDo baru — jika lanjut, board saat ini akan hilang. Lanjutkan?");
       if (!ok) return;
     }
-
-    // load history items into board for editing
     const items = JSON.parse(history.items || "[]");
-    // map to todo-like objects (no DB ids)
     const mapped = items.map((it, idx) => ({ id: `hist-${history.id}-${idx}`, task: it.task, description: it.description || "", status: normalizeTodoStatus(it.status), tipe: it.tipe || "PERSONAL", authorId: it.authorId || null }));
     setHistoryEditBackup(todos);
     setTodos(mapped);
@@ -455,9 +520,7 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
   }
 
   function handleCancelHistoryEdit() {
-    if (historyEditBackup) {
-      setTodos(historyEditBackup);
-    }
+    if (historyEditBackup) setTodos(historyEditBackup);
     setHistoryEditBackup(null);
     setEditingHistory(null);
   }
@@ -470,9 +533,7 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
   async function handleConfirmDeleteHistory() {
     if (!historyIdToDelete) return;
     const res = await deleteHistory(historyIdToDelete);
-    if (res.success) {
-      await handleRefreshHistories();
-    }
+    if (res.success) await handleRefreshHistories();
     setShowDeleteHistoryModal(false);
     setHistoryIdToDelete(null);
   }
@@ -489,7 +550,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <p className="brutal-label">TASK MANAGER</p>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Team/Personal Toggle */}
           {userTeamId && (
             <div className="flex bg-surface-light border-2 border-primary rounded-[4px] overflow-hidden text-[10px] font-black">
               <button type="button" onClick={() => setIsTeamTask(false)} className={`px-2.5 py-1 flex items-center gap-1 transition-colors ${!isTeamTask ? "bg-primary text-white" : "text-text-muted hover:text-text-dark"}`}>
@@ -500,7 +560,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
               </button>
             </div>
           )}
-          {/* View Toggle */}
           <div className="flex bg-surface-light border-2 border-primary rounded-[4px] overflow-hidden text-[10px] font-black">
             <button onClick={() => setView("list")} className={`px-2.5 py-1 flex items-center gap-1 transition-colors ${view === "list" ? "bg-primary text-white" : "text-text-muted hover:text-text-dark"}`}>
               <List size={11} /> LIST
@@ -535,17 +594,13 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
               >
                 Simpan Histori
               </button>
-              <button
-                onClick={handleCancelHistoryEdit}
-                className="px-3 py-2 bg-zinc-200 text-black border-2 border-black text-[11px] font-black uppercase"
-              >
+              <button onClick={handleCancelHistoryEdit} className="px-3 py-2 bg-zinc-200 text-black border-2 border-black text-[11px] font-black uppercase">
                 Batal Edit
               </button>
             </div>
           </div>
         )}
 
-        {/* Form Tambah */}
         <form onSubmit={handleAdd} className="mb-4 bg-surface-light p-3 border-2 border-primary-light rounded-[6px]">
           <div className="flex gap-2">
             <input
@@ -566,13 +621,8 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
             </button>
           </div>
           <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setShowDesc(!showDesc)}
-              className="text-[11px] font-bold text-text-muted hover:text-primary transition-colors flex items-center gap-1 px-1"
-            >
-              <AlignLeft size={12} />
-              {showDesc ? "Tutup Deskripsi" : "Deskripsi"}
+            <button type="button" onClick={() => setShowDesc(!showDesc)} className="text-[11px] font-bold text-text-muted hover:text-primary transition-colors flex items-center gap-1 px-1">
+              <AlignLeft size={12} /> {showDesc ? "Tutup Deskripsi" : "Deskripsi"}
             </button>
           </div>
           {showDesc && (
@@ -586,7 +636,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
           )}
         </form>
 
-        {/* Action buttons: Template + WhatsApp */}
         <div className="flex items-center gap-2 mb-5 flex-wrap">
           <button
             onClick={openTemplateModal}
@@ -608,7 +657,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
                 title="Simpan ke Histori sebelum Share?"
                 message={"Pilih 'Simpan & Bagikan' untuk menyimpan snapshot saat ini ke histori, atau pilih 'Bagikan tanpa menyimpan' untuk langsung membagikan."}
                 onCancel={async () => {
-                  // Share without saving
                   setShowSaveBeforeShareModal(false);
                   shareToWhatsApp(todos, userName, effectiveReportTitle);
                 }}
@@ -620,16 +668,13 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
                       window.alert(result?.error || "Gagal menyimpan histori.");
                       return;
                     }
-                    if (result.data) {
-                      setHistories((prev) => [result.data, ...prev]);
-                    } else {
-                      await handleRefreshHistories();
-                    }
+                    if (result.data) setHistories((prev) => [result.data, ...prev]);
+                    else await handleRefreshHistories();
+                    
                     clearBoardLocal();
                     setReportTitle("");
                     shareToWhatsApp(todos, userName, effectiveReportTitle);
                   } catch (err) {
-                    // ignore
                   } finally {
                     setSaveBeforeShareLoading(false);
                     setShowSaveBeforeShareModal(false);
@@ -663,23 +708,31 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
           <p className="text-[10px] text-text-muted mt-2">Jika dikosongkan, judul otomatis menggunakan <span className="font-bold">Task Report</span>.</p>
         </div>
 
-        {/* ===== VIEW: LIST ===== */}
         {view === "list" && (
           <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {todos.length === 0 ? (
               <p className="text-sm text-text-muted text-center py-8 italic">Belum ada tugas saat ini.</p>
             ) : (
               todos.map((todo) => (
-                <TaskCard key={todo.id} todo={todo} currentUserId={currentUserId} userTeamId={userTeamId} isPending={isPending} startTransition={startTransition} draggable={false} onChangeStatus={handleMoveTodoStatus} />
+                <TaskCard 
+                  key={todo.id} 
+                  todo={todo} 
+                  currentUserId={currentUserId} 
+                  userTeamId={userTeamId} 
+                  isPending={isPending} 
+                  startTransition={startTransition} 
+                  draggable={false} 
+                  onChangeStatus={handleMoveTodoStatus} 
+                  statusFlow={LIST_STATUS_FLOW} 
+                />
               ))
             )}
           </div>
         )}
 
-        {/* ===== VIEW: BOARD (Kanban) ===== */}
         {view === "board" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {STATUS_FLOW.map((statusKey) => (
+            {BOARD_STATUS_FLOW.map((statusKey) => (
               <KanbanColumn
                 key={statusKey}
                 statusKey={statusKey}
@@ -695,14 +748,14 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
                 draggedTodoId={draggedTodoId}
                 onCardDragStart={handleDragStart}
                 onCardDragEnd={handleDragEnd}
+                statusFlow={BOARD_STATUS_FLOW}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* ===== MODAL: PILIH TEMPLATE ===== */}
-      {/* ===== PANEL: HISTORY ===== */}
+      {/* ===== PANEL HISTORY ===== */}
       {showHistoryPanel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white border-[4px] border-black shadow-[8px_8px_0px_0px_#111827] p-6 max-w-2xl w-full animate-fade-in-up max-h-[84vh] overflow-y-auto">
@@ -743,7 +796,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
                         <button
                           onClick={() => handleEditHistoryClick(h)}
                           title="Edit histori"
-                          aria-label="Edit histori"
                           className="w-9 h-9 flex items-center justify-center border-2 border-black bg-primary text-white rounded-[4px] shadow-[2px_2px_0px_0px_#111827] hover:brightness-110 transition-all active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#111827]"
                         >
                           <Pencil size={14} />
@@ -751,7 +803,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
                         <button
                           onClick={() => handleShareHistory(h)}
                           title="Share WhatsApp"
-                          aria-label="Share WhatsApp"
                           className="w-9 h-9 flex items-center justify-center border-2 border-black bg-green-600 text-white rounded-[4px] shadow-[2px_2px_0px_0px_#111827] hover:bg-green-700 transition-all active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#111827]"
                         >
                           <MessageCircle size={14} />
@@ -759,7 +810,6 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
                         <button
                           onClick={() => handleDeleteHistory(h.id)}
                           title="Hapus histori"
-                          aria-label="Hapus histori"
                           className="w-9 h-9 flex items-center justify-center border-2 border-black bg-red-500 text-white rounded-[4px] shadow-[2px_2px_0px_0px_#111827] hover:bg-red-600 transition-all active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#111827]"
                         >
                           <Trash2 size={14} />
@@ -788,62 +838,172 @@ export default function TaskManager({ initialTodos = [], userTeamId, currentUser
         type="danger"
       />
 
+      {/* ===== MODAL TEMPLATE (LIST, CREATE, UPDATE) ===== */}
       {showTemplateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white border-[4px] border-black shadow-[8px_8px_0px_0px_#111827] p-6 max-w-md w-full animate-fade-in-up max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b-[3px] border-black pb-3 mb-5">
               <div className="flex items-center gap-2">
                 <ClipboardList size={20} className="text-primary" />
-                <h3 className="font-black text-lg uppercase tracking-tight">Pilih Template</h3>
+                <h3 className="font-black text-lg uppercase tracking-tight">
+                  {showCreateTemplateForm 
+                    ? (editingTemplateId ? "Edit Template" : "Buat Template Baru") 
+                    : "Pilih Template"}
+                </h3>
               </div>
-              <button onClick={() => setShowTemplateModal(false)} className="hover:text-danger transition-colors">
+              <button onClick={closeTemplateModal} className="hover:text-danger transition-colors">
                 <X size={24} />
               </button>
             </div>
 
-            {isTeamTask && (
-              <p className="text-[11px] font-bold text-text-muted bg-zinc-100 border-2 border-zinc-200 px-3 py-2 rounded mb-4">
-                ℹ️ Tugas dari template akan dibuat sebagai tugas <span className="text-text-dark">TIM</span>
-              </p>
-            )}
-
-            {loadingTemplates ? (
-              <div className="py-12 text-center">
-                <Loader2 size={24} className="animate-spin mx-auto text-primary" />
-              </div>
-            ) : templates.length === 0 ? (
-              <div className="py-12 text-center">
-                <p className="text-sm text-text-muted font-bold">Belum ada template.</p>
-                <p className="text-xs text-text-light mt-1">Admin perlu membuat template terlebih dahulu di halaman Kelola Akun.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {templates.map((tpl) => (
-                  <div key={tpl.id} className="border-2 border-primary-light rounded-[6px] p-4 hover:border-primary transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-text-dark uppercase">{tpl.title}</p>
-                        <div className="mt-2 space-y-1">
-                          {tpl.items.map((item, i) => (
-                            <p key={i} className="text-[11px] text-text-muted flex items-center gap-1.5">
-                              <Circle size={10} className="text-text-light flex-shrink-0" /> {item}
-                            </p>
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-text-light mt-2">{tpl.items.length} item</p>
-                      </div>
-                      <button
-                        onClick={() => handleUseTemplate(tpl.id)}
-                        disabled={usingTemplate === tpl.id}
-                        className="bg-primary text-white px-3 py-2 text-[10px] font-black uppercase border-2 border-text-dark shadow-[2px_2px_0px_0px_#111827] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#111827] transition-all disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
-                      >
-                        {usingTemplate === tpl.id ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                        PAKAI
-                      </button>
+            {showCreateTemplateForm ? (
+              // FORM PEMBUATAN / EDIT TEMPLATE
+              <form onSubmit={submitTemplateForm} className="space-y-5">
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-text-dark mb-2">Nama Template</label>
+                  <input
+                    value={newTemplateTitle}
+                    onChange={e => setNewTemplateTitle(e.target.value)}
+                    required
+                    placeholder="Contoh: Laporan Harian"
+                    className="w-full border-2 border-primary rounded-[4px] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface-light"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-text-dark mb-2">Daftar Tugas</label>
+                  {newTemplateItems.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2 mb-2">
+                      <input
+                        required
+                        value={item}
+                        onChange={e => handleTemplateItemChange(idx, e.target.value)}
+                        placeholder="Contoh: Cek email..."
+                        className="flex-1 border-2 border-primary-light rounded-[4px] px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-surface-light"
+                      />
+                      {newTemplateItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTemplateItem(idx)}
+                          className="p-1.5 text-text-light hover:text-danger hover:bg-red-50 rounded transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddTemplateItem}
+                    className="mt-2 text-[11px] font-black uppercase tracking-wider text-primary hover:text-primary-dark transition-colors flex items-center gap-1"
+                  >
+                    <Plus size={12} /> Tambah Tugas
+                  </button>
+                </div>
+                
+                <div className="flex items-center gap-2 justify-end pt-4 border-t-2 border-dashed border-primary-light">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateTemplateForm(false);
+                      setEditingTemplateId(null);
+                      setNewTemplateTitle("");
+                      setNewTemplateItems([""]);
+                    }}
+                    className="px-4 py-2 bg-zinc-200 text-black border-2 border-black text-[11px] font-black uppercase shadow-[2px_2px_0px_0px_#111827] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#111827] transition-all"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreatingTemplate}
+                    className="px-4 py-2 bg-primary text-white border-2 border-text-dark text-[11px] font-black uppercase shadow-[2px_2px_0px_0px_#111827] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#111827] transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isCreatingTemplate ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {editingTemplateId ? "Simpan Perubahan" : "Simpan Template"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              // DAFTAR TEMPLATE (DAN TOMBOL BUAT BARU)
+              <>
+                <div className="mb-4">
+                  <button
+                    onClick={() => {
+                      setEditingTemplateId(null);
+                      setNewTemplateTitle("");
+                      setNewTemplateItems([""]);
+                      setShowCreateTemplateForm(true);
+                    }}
+                    className="w-full flex justify-center items-center gap-1.5 px-3 py-2.5 text-[11px] font-black uppercase tracking-wider bg-surface-light text-primary border-2 border-dashed border-primary rounded-[4px] hover:border-solid hover:bg-primary hover:text-white transition-all"
+                  >
+                    <Plus size={14} /> Buat Template Baru
+                  </button>
+                </div>
+
+                {isTeamTask && (
+                  <p className="text-[11px] font-bold text-text-muted bg-zinc-100 border-2 border-zinc-200 px-3 py-2 rounded mb-4">
+                    ℹ️ Tugas dari template akan dibuat sebagai tugas <span className="text-text-dark">TIM</span>
+                  </p>
+                )}
+
+                {loadingTemplates ? (
+                  <div className="py-12 text-center">
+                    <Loader2 size={24} className="animate-spin mx-auto text-primary" />
                   </div>
-                ))}
-              </div>
+                ) : templates.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-sm text-text-muted font-bold">Belum ada template tersimpan.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {templates.map((tpl) => (
+                      <div key={tpl.id} className="border-2 border-primary-light rounded-[6px] p-4 hover:border-primary transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-text-dark uppercase">{tpl.title}</p>
+                            <div className="mt-2 space-y-1">
+                              {tpl.items.map((item, i) => (
+                                <p key={i} className="text-[11px] text-text-muted flex items-center gap-1.5">
+                                  <Circle size={10} className="text-text-light flex-shrink-0" /> {item}
+                                </p>
+                              ))}
+                            </div>
+                            
+                            {/* Actions Bawah: Info & Tombol Edit/Hapus */}
+                            <div className="flex items-center gap-3 mt-3">
+                              <p className="text-[10px] text-text-light flex-shrink-0">{tpl.items.length} item</p>
+                              <div className="w-[1px] h-3 bg-zinc-300"></div>
+                              <button
+                                onClick={() => handleEditTemplate(tpl)}
+                                className="text-[10px] flex items-center gap-1 text-text-muted hover:text-primary transition-colors"
+                                title="Edit Template"
+                              >
+                                <Pencil size={11} /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTemplate(tpl.id)}
+                                className="text-[10px] flex items-center gap-1 text-text-muted hover:text-danger transition-colors"
+                                title="Hapus Template"
+                              >
+                                <Trash2 size={11} /> Hapus
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleUseTemplate(tpl.id)}
+                            disabled={usingTemplate === tpl.id}
+                            className="bg-primary text-white px-3 py-2 text-[10px] font-black uppercase border-2 border-text-dark shadow-[2px_2px_0px_0px_#111827] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#111827] transition-all disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
+                          >
+                            {usingTemplate === tpl.id ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                            PAKAI
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
