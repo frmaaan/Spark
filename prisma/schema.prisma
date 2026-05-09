@@ -152,6 +152,7 @@ model Team {
   todos         Todo[]
   users         User[]
   todoTemplates TodoTemplate[]
+  monitoringCategoryTeams MonitoringCategoryTeam[]
 
   @@map("teams")
 }
@@ -204,4 +205,93 @@ model TodoHistory {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("todo_histories")
+}
+
+// =============================================================
+// MODEL: MonitoringCategory (Kategori Papan Monitoring)
+// =============================================================
+model MonitoringCategory {
+  id        Int      @id @default(autoincrement())
+  nama      String   @unique
+  
+  items     MonitoringItem[]
+  categoryTeams MonitoringCategoryTeam[]
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("monitoring_categories")
+}
+
+// =============================================================
+// MODEL: MonitoringItem (Produk/Barang yang dimonitor)
+// =============================================================
+model MonitoringItem {
+  id           Int      @id @default(autoincrement())
+  categoryId   Int      @map("category_id")
+  kode         String   @unique
+  nama         String
+  stokAwal     Int      @default(0) @map("stok_awal")
+  
+  category     MonitoringCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  transactions MonitoringTransaction[]
+
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("monitoring_items")
+}
+
+// Join table: many-to-many between MonitoringCategory and Team
+model MonitoringCategoryTeam {
+  id          Int @id @default(autoincrement())
+  categoryId  Int @map("category_id")
+  teamId      Int @map("team_id")
+
+  category    MonitoringCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  team        Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, teamId])
+  @@map("monitoring_category_teams")
+}
+
+// =============================================================
+// MODEL: MonitoringLocation (Lokasi/Gudang Penyimpanan)
+// =============================================================
+model MonitoringLocation {
+  id        Int      @id @default(autoincrement())
+  nama      String   @unique
+  
+  transactions MonitoringTransaction[] @relation("LocationTransactions")
+  incomingTransfers MonitoringTransaction[] @relation("IncomingTransfers")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("monitoring_locations")
+}
+
+// =============================================================
+// MODEL: MonitoringTransaction (Riwayat Mutasi In/Out/Transfer)
+// =============================================================
+model MonitoringTransaction {
+  id        Int      @id @default(autoincrement())
+  itemId    Int      @map("item_id")
+  
+  tipe      String   // Wajib bernilai "IN", "OUT", atau "TRANSFER"
+  qty       Int
+  tanggal   DateTime
+  catatan   String?  @db.Text
+  
+  locationId Int?    @map("location_id")
+  location   MonitoringLocation? @relation("LocationTransactions", fields: [locationId], references: [id], onDelete: Cascade)
+
+  toLocationId Int?  @map("to_location_id") // Tujuan untuk TRANSFER
+  toLocation   MonitoringLocation? @relation("IncomingTransfers", fields: [toLocationId], references: [id], onDelete: Cascade)
+
+  // Opsional: Lacak siapa yang menginput
+  // authorId Int?     @map("author_id")
+
+  item      MonitoringItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("monitoring_transactions")
 }

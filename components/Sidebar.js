@@ -13,9 +13,10 @@ import {
   Settings,
   ShieldCheck,
   UserCircle,
+  BarChart3,
 } from "lucide-react";
 
-export default function Sidebar({ userName = "Admin", userRole = "USER", appName = "StacX SPKL" }) {
+export default function Sidebar({ userName = "Admin", userRole = "USER", appName = "" }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -24,6 +25,7 @@ export default function Sidebar({ userName = "Admin", userRole = "USER", appName
     { label: "Dashboard", href: "/", icon: LayoutDashboard, description: "Ringkasan & statistik" },
     { label: "Data Pengguna", href: "/pengguna", icon: Users, description: "Kelola data karyawan" },
     { label: "Input SPKL", href: "/spkl", icon: FileText, description: "Buat surat lembur" },
+    { label: "Monitoring", href: "/monitoring", icon: BarChart3, description: "Pantau aset & stok" },
     ...(userRole === "ADMIN" ? [{ label: "Kelola Akun", href: "/akun", icon: ShieldCheck, description: "Manajemen akun login" }] : []),
     ...(userRole === "ADMIN" ? [{ label: "Pengaturan", href: "/settings", icon: Settings, description: "Konfigurasi sistem" }] : []),
   ];
@@ -139,7 +141,7 @@ export default function Sidebar({ userName = "Admin", userRole = "USER", appName
         {/* FOOTER */}
         <div className="px-6 py-4 border-t-[3px] border-black bg-white flex-shrink-0 flex flex-col gap-3">
           <div className="flex justify-between items-center">
-            <Link 
+            <Link
               href="/profil"
               onClick={() => setIsOpen(false)}
               className="min-w-0 flex-1 pr-2 hover:opacity-70 transition-opacity group cursor-pointer"
