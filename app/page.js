@@ -1,7 +1,7 @@
 // app/page.js
 import prisma from "@/lib/prisma";
 import Link from "next/link";
-import { Users, FileText, ClipboardList, ArrowUpRight, CheckCircle2, ListTodo, Clock } from "lucide-react";
+import { Users, FileText, ClipboardList, ArrowUpRight, CheckCircle2, ListTodo, Clock, BarChart3 } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { getSettings } from "@/lib/actions/settingActions";
 import { getTodos } from "@/lib/actions/todoActions";
@@ -137,7 +137,7 @@ export default async function Dashboard() {
       {/* AKSI CEPAT */}
       <section>
         <p className="brutal-label mb-4">AKSI CEPAT</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Link
             href="/pengguna"
             id="quick-action-pengguna"
@@ -166,6 +166,22 @@ export default async function Dashboard() {
             <div className="min-w-0">
               <h3 className="text-sm font-black text-text-dark uppercase tracking-tight">BUAT SPKL BARU</h3>
               <p className="text-xs text-text-muted mt-0.5">Input & export ke Excel</p>
+            </div>
+            <ArrowUpRight size={15} className="text-text-muted group-hover:text-primary transition-colors ml-auto flex-shrink-0" />
+          </Link>
+
+          <Link
+            href="/monitoring"
+            id="quick-action-monitoring"
+            className="group bg-white border-2 border-primary p-6 shadow-[4px_4px_0px_0px_#111827] hover:shadow-[6px_6px_0px_0px_#111827] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all animate-fade-in-up rounded-2xl flex items-center gap-4"
+            style={{ animationDelay: "0.25s" }}
+          >
+            <div className="w-11 h-11 border-2 border-primary rounded-[6px] flex items-center justify-center group-hover:bg-primary transition-colors flex-shrink-0">
+              <BarChart3 size={20} className="text-primary group-hover:text-white transition-colors" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-black text-text-dark uppercase tracking-tight">MONITORING</h3>
+              <p className="text-xs text-text-muted mt-0.5">Pantau stok dan mutasi barang</p>
             </div>
             <ArrowUpRight size={15} className="text-text-muted group-hover:text-primary transition-colors ml-auto flex-shrink-0" />
           </Link>

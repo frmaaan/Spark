@@ -6,8 +6,7 @@ export default function InteractiveLoginBackground() {
   const canvasRef = useRef(null);
   const pointerRef = useRef({ x: -1000, y: -1000, active: false });
   const isClickingRef = useRef(false);
-  const shockwavesRef = useRef([]);
-  const gridRef = useRef([]);
+  const entitiesRef = useRef([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -16,54 +15,43 @@ export default function InteractiveLoginBackground() {
     let animationId;
 
     // ==========================================
-    // ENGINE 3D ISOMETRIK & NEO-BRUTALISM
+    // NEO-BRUTALISM: FLAT & LOUD CONFIG
     // ==========================================
-    const W_HALF = 32; // Setengah lebar pilar (Ukuran X)
-    const H_HALF = 18; // Setengah tinggi isometrik (Ukuran Y)
+    const COLORS = [
+      '#fde047', // Cyber Yellow
+      '#f472b6', // Hot Pink
+      '#4ade80', // Acid Green
+      '#c084fc', // Brutal Purple
+      '#ffffff'  // Pure White
+    ];
     
-    // Palet Warna Brutalis Ekstrim
-    const COLORS = {
-      bg: '#f8fafc',         // Latar belakang sengaja terang
-      outline: '#111827',    // Hitam pekat brutal
-      top: '#ffffff',        // Atap putih
-      left: '#e5e7eb',       // Bayangan kiri (terang)
-      right: '#9ca3af',      // Bayangan kanan (gelap)
-      accentTop: '#fde047',  // Atap kuning (Aksen)
-      accentCore: '#ef4444', // Inti merah saat ditarik tinggi
-      cyberCyan: '#06b6d4'   // Aksen UI Tracker
-    };
+    const LABELS = ['AUTH', 'ACCESS', '404', 'SYS', 'OK', 'DENIED', 'USER', '***'];
+    const SHAPES = ['rect', 'circle', 'pill'];
 
-    const BRUTAL_WORDS = ['STACX', 'PPIC', 'SYS', 'INV', '01'];
-
-    // Membuat Topologi Grid
-    const initGrid = () => {
+    // Membuat Elemen Melayang
+    const initEntities = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       
-      // Hitung jumlah baris/kolom agar menutupi seluruh layar (bahkan saat di-pan)
-      const size = Math.max(canvas.width, canvas.height);
-      const cols = Math.ceil(size / W_HALF) + 10;
-      const rows = Math.ceil(size / H_HALF) + 10;
+      const count = Math.floor((canvas.width * canvas.height) / 40000); // Kepadatan dinamis
+      entitiesRef.current = [];
 
-      gridRef.current = [];
-
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          // Hanya render pola catur (checkerboard) atau acak untuk memberi ruang
-          if ((r + c) % 2 === 0) continue; 
-
-          const isAccent = Math.random() > 0.95;
-          const hasWord = Math.random() > 0.9;
-          const word = hasWord ? BRUTAL_WORDS[Math.floor(Math.random() * BRUTAL_WORDS.length)] : '';
-
-          gridRef.current.push({
-            r, c, 
-            z: 0,           // Ketinggian 3D
-            vz: 0,          // Kecepatan vertikal (Spring physics)
-            targetZ: 5,     // Target diam (sedikit timbul)
-            isAccent, word
-          });
-        }
+      for (let i = 0; i < count; i++) {
+        const size = 60 + Math.random() * 80; // Ukuran random besar-besar
+        entitiesRef.current.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          vx: (Math.random() - 0.5) * 2, // Kecepatan X
+          vy: (Math.random() - 0.5) * 2, // Kecepatan Y
+          size: size,
+          width: size * (1 + Math.random()), 
+          height: size * 0.6,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+          text: LABELS[Math.floor(Math.random() * LABELS.length)],
+          angle: Math.random() * Math.PI * 2,
+          vAngle: (Math.random() - 0.5) * 0.02 // Rotasi
+        });
       }
     };
 
@@ -74,179 +62,167 @@ export default function InteractiveLoginBackground() {
       pointerRef.current = { x: e.clientX, y: e.clientY, active: true };
     };
     const handleLeave = () => { pointerRef.current.active = false; };
-    const handleDown = (e) => {
-      isClickingRef.current = true;
-      // Ledakan Shockwave Brutalis
-      shockwavesRef.current.push({ x: e.clientX, y: e.clientY, radius: 0, power: 120 });
-    };
+    const handleDown = () => { isClickingRef.current = true; };
     const handleUp = () => { isClickingRef.current = false; };
 
     // ==========================================
-    // RENDER LOOP
+    // RENDER & PHYSICS LOOP
     // ==========================================
     const draw = () => {
-      ctx.fillStyle = COLORS.bg;
+      // 1. Gambar Background Dot Grid
+      ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Gambar Grid Background Polos (Blueprint style)
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < canvas.width; i += 64) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+      
+      ctx.fillStyle = '#cbd5e1';
+      for (let i = 20; i < canvas.width; i += 40) {
+        for (let j = 20; j < canvas.height; j += 40) {
+          ctx.beginPath();
+          ctx.arc(i, j, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
-      ctx.lineJoin = 'round';
       const pointer = pointerRef.current;
 
-      // Update Shockwaves
-      shockwavesRef.current = shockwavesRef.current.filter(sw => {
-        sw.radius += 35; // Kecepatan ledakan
+      // 2. Update & Render Entities (Fisika Stiker)
+      entitiesRef.current.forEach(entity => {
+        // --- FISIKA ---
+        if (pointer.active) {
+          const dx = pointer.x - entity.x;
+          const dy = pointer.y - entity.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (isClickingRef.current) {
+            // Implosion: Sedot semua elemen jika diklik (Black Hole Mode)
+            if (dist < 400) {
+              const pull = (400 - dist) / 400;
+              entity.vx += (dx / dist) * pull * 1.5;
+              entity.vy += (dy / dist) * pull * 1.5;
+              entity.vAngle += 0.05; // Muter kencang saat tersedot
+            }
+          } else {
+            // Repulsion: Dorong elemen menjauh saat kursor mendekat
+            if (dist < 150) {
+              const push = (150 - dist) / 150;
+              entity.vx -= (dx / dist) * push * 2;
+              entity.vy -= (dy / dist) * push * 2;
+            }
+          }
+        }
+
+        // Gesekan udara (Friction) & batas kecepatan
+        entity.vx *= 0.98;
+        entity.vy *= 0.98;
         
-        // Gambar lingkaran ledakan kawat (Wireframe shockwave)
-        ctx.beginPath();
-        ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
-        ctx.strokeStyle = COLORS.outline;
-        ctx.lineWidth = 4;
-        ctx.setLineDash([15, 15]);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // Agar tidak berhenti total (Constant roaming speed)
+        if (Math.abs(entity.vx) < 0.2) entity.vx += (Math.random() - 0.5) * 0.1;
+        if (Math.abs(entity.vy) < 0.2) entity.vy += (Math.random() - 0.5) * 0.1;
 
-        return sw.radius < Math.max(canvas.width, canvas.height);
-      });
+        // Terapkan kecepatan ke posisi
+        entity.x += entity.vx;
+        entity.y += entity.vy;
+        entity.angle += entity.vAngle;
+        entity.vAngle *= 0.95; // Perlambat putaran
 
-      // Pusat koordinat isometrik (ditengah layar)
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height * 0.2; // Sedikit dinaikkan ke atas
+        // Pantulan Dinding Layar
+        if (entity.x < 0) { entity.x = 0; entity.vx *= -1; }
+        if (entity.x > canvas.width) { entity.x = canvas.width; entity.vx *= -1; }
+        if (entity.y < 0) { entity.y = 0; entity.vy *= -1; }
+        if (entity.y > canvas.height) { entity.y = canvas.height; entity.vy *= -1; }
 
-      // Sortir array agar digambar dari belakang ke depan (Z-Indexing isometrik)
-      // Rumus isometrik: kedalaman diukur dari (r + c)
-      gridRef.current.sort((a, b) => (a.r + a.c) - (b.r + b.c));
+        // --- RENDER NEO-BRUTALISM SHAPES ---
+        ctx.save();
+        ctx.translate(entity.x, entity.y);
+        ctx.rotate(entity.angle);
 
-      gridRef.current.forEach(tile => {
-        // --- 1. MATEMATIKA ISOMETRIK ---
-        // Konversi grid (r, c) ke layar X, Y
-        const screenX = (tile.c - tile.r) * W_HALF + centerX;
-        const screenY = (tile.c + tile.r) * H_HALF + centerY;
+        const border = 4; // Border super tebal
+        const shadowOffset = 8; // Hard Drop Shadow
 
-        // Jangan render jika di luar layar jauh (Optimasi Performa)
-        if (screenX < -100 || screenX > canvas.width + 100 || screenY < -100 || screenY > canvas.height + 200) {
-          return;
-        }
+        ctx.lineWidth = border;
+        ctx.strokeStyle = '#0f172a'; // Slate 900
+        ctx.lineJoin = 'miter';
 
-        // --- 2. FISIKA GRAVITASI & MAGNET ---
-        tile.targetZ = 5; // Default tinggi
+        // Fungsi menggambar bentuk
+        const drawShape = (isShadow) => {
+          ctx.beginPath();
+          if (entity.shape === 'rect') {
+            ctx.rect(-entity.width/2, -entity.height/2, entity.width, entity.height);
+          } else if (entity.shape === 'circle') {
+            ctx.arc(0, 0, entity.size / 2, 0, Math.PI * 2);
+          } else if (entity.shape === 'pill') {
+            const r = entity.height / 2;
+            const w = entity.width;
+            ctx.roundRect(-w/2, -r, w, entity.height, r);
+          }
 
-        const dist = Math.hypot(pointer.x - screenX, pointer.y - screenY);
+          if (isShadow) {
+            ctx.fillStyle = '#0f172a'; // Shadow solid hitam
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = entity.color;
+            ctx.fill();
+            ctx.stroke();
+          }
+        };
 
-        // Magnetisasi Kursor: Jika kursor mendekat, pilar DITARIK ke atas!
-        if (pointer.active && dist < 250) {
-          const pull = Math.pow(1 - dist / 250, 2);
-          tile.targetZ = 15 + pull * 160; // Tinggi maksimal pilar 175px!
-        }
+        // 1. Gambar Bayangan Dulu (Offset ke bawah kanan)
+        ctx.save();
+        ctx.translate(shadowOffset, shadowOffset);
+        drawShape(true);
+        ctx.restore();
 
-        // Tahan klik untuk menambah tarikan ekstrim
-        if (isClickingRef.current && dist < 150) {
-          tile.targetZ += 80; 
-        }
+        // 2. Gambar Bentuk Utama
+        drawShape(false);
 
-        // Hantaman Shockwave (Banting pilar ke bawah)
-        shockwavesRef.current.forEach(sw => {
-          const swDist = Math.abs(Math.hypot(sw.x - screenX, sw.y - screenY) - sw.radius);
-          if (swDist < 40) tile.vz -= 40; // Gaya banting
-        });
-
-        // Mekanika Pegas (Spring Physics)
-        tile.vz += (tile.targetZ - tile.z) * 0.15; // Ketegangan (Tension)
-        tile.vz *= 0.75; // Gesekan / Berat (Friction)
-        tile.z += tile.vz;
-
-        if (tile.z < 0) { tile.z = 0; tile.vz *= -0.5; } // Pantulan tanah
-
-        // --- 3. MENGGAMBAR PILAR 3D ---
-        const z = tile.z;
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = COLORS.outline;
-
-        // Warna dinamis jika ditarik sangat tinggi (Exposed Core)
-        const leftColor = z > 100 ? COLORS.accentCore : COLORS.left;
-        const rightColor = z > 100 ? '#b91c1c' : COLORS.right; // Merah gelap
-        const topColor = tile.isAccent ? COLORS.accentTop : COLORS.top;
-
-        // Muka Kiri (Left Face)
-        ctx.fillStyle = leftColor;
-        ctx.beginPath();
-        ctx.moveTo(screenX - W_HALF, screenY - z); // Kiri atas
-        ctx.lineTo(screenX, screenY + H_HALF - z); // Tengah bawah
-        ctx.lineTo(screenX, screenY + H_HALF);     // Tengah tanah
-        ctx.lineTo(screenX - W_HALF, screenY);     // Kiri tanah
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-
-        // Muka Kanan (Right Face)
-        ctx.fillStyle = rightColor;
-        ctx.beginPath();
-        ctx.moveTo(screenX, screenY + H_HALF - z); // Tengah bawah
-        ctx.lineTo(screenX + W_HALF, screenY - z); // Kanan atas
-        ctx.lineTo(screenX + W_HALF, screenY);     // Kanan tanah
-        ctx.lineTo(screenX, screenY + H_HALF);     // Tengah tanah
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-
-        // Muka Atas (Top Face)
-        ctx.fillStyle = topColor;
-        ctx.beginPath();
-        ctx.moveTo(screenX, screenY - H_HALF - z); // Puncak
-        ctx.lineTo(screenX + W_HALF, screenY - z); // Kanan
-        ctx.lineTo(screenX, screenY + H_HALF - z); // Bawah
-        ctx.lineTo(screenX - W_HALF, screenY - z); // Kiri
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-
-        // Detail Teks Brutalis di Atap
-        if (tile.word) {
-          ctx.fillStyle = COLORS.outline;
-          ctx.font = '900 12px Inter, sans-serif';
+        // 3. Teks Brutalis di Dalamnya
+        if (entity.shape !== 'circle') { // Lingkaran terlalu kecil untuk teks
+          ctx.fillStyle = '#0f172a';
+          ctx.font = '900 20px "Space Grotesk", Inter, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          // Render teks gepeng agar terkesan menempel di atap isometrik
-          ctx.save();
-          ctx.translate(screenX, screenY - z);
-          ctx.scale(1, 0.5); // Efek perspektif gepeng
-          ctx.fillText(tile.word, 0, 0);
-          ctx.restore();
+          ctx.fillText(entity.text, 0, 0);
         }
+
+        ctx.restore();
       });
 
-      // --- 4. UI TRACKER (CROSSHAIR & HUD) ---
+      // --- 3. CUSTOM CURSOR BRUTALIST ---
       if (pointer.active) {
-        ctx.strokeStyle = COLORS.outline;
-        ctx.lineWidth = 3;
+        // Hard Shadow untuk kursor
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(pointer.x + 6, pointer.y + 6, isClickingRef.current ? 15 : 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Kursor Utama
+        ctx.fillStyle = isClickingRef.current ? '#ef4444' : '#fde047';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(pointer.x, pointer.y, isClickingRef.current ? 15 : 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Cross di dalam kursor
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(pointer.x - 2, pointer.y - 10, 4, 20);
+        ctx.fillRect(pointer.x - 10, pointer.y - 2, 20, 4);
+
+        // Label Info Kursor
+        const labelText = isClickingRef.current ? 'PULLING...' : 'IDLE';
+        ctx.fillStyle = '#0f172a'; // Label Shadow
+        ctx.fillRect(pointer.x + 25 + 4, pointer.y + 15 + 4, 80, 26);
         
-        // Lingkaran Radar Kursor
-        ctx.beginPath();
-        ctx.arc(pointer.x, pointer.y, 40, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Garis Pembidik
-        ctx.beginPath();
-        ctx.moveTo(pointer.x - 60, pointer.y); ctx.lineTo(pointer.x - 20, pointer.y);
-        ctx.moveTo(pointer.x + 60, pointer.y); ctx.lineTo(pointer.x + 20, pointer.y);
-        ctx.moveTo(pointer.x, pointer.y - 60); ctx.lineTo(pointer.x, pointer.y - 20);
-        ctx.moveTo(pointer.x, pointer.y + 60); ctx.lineTo(pointer.x, pointer.y + 20);
-        ctx.stroke();
-
-        // Titik Inti
-        ctx.fillStyle = COLORS.cyberCyan;
-        ctx.fillRect(pointer.x - 4, pointer.y - 4, 8, 8);
-        ctx.strokeRect(pointer.x - 4, pointer.y - 4, 8, 8);
-
-        // Teks HUD Animasi (Kesan Sistem Aktif)
-        ctx.fillStyle = COLORS.outline;
-        ctx.font = '900 10px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(`X:${pointer.x} Y:${pointer.y}`, pointer.x + 50, pointer.y - 45);
-        ctx.fillText(`PWR: ${(Math.random() * 100).toFixed(1)}%`, pointer.x + 50, pointer.y - 30);
+        ctx.fillStyle = '#ffffff'; // Label Main
+        ctx.fillRect(pointer.x + 25, pointer.y + 15, 80, 26);
+        ctx.strokeRect(pointer.x + 25, pointer.y + 15, 80, 26);
+        
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '800 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, pointer.x + 65, pointer.y + 28);
       }
 
       animationId = requestAnimationFrame(draw);
@@ -256,9 +232,9 @@ export default function InteractiveLoginBackground() {
     window.addEventListener('mouseleave', handleLeave);
     window.addEventListener('mousedown', handleDown);
     window.addEventListener('mouseup', handleUp);
-    window.addEventListener('resize', initGrid);
+    window.addEventListener('resize', initEntities);
 
-    initGrid();
+    initEntities();
     draw();
 
     return () => {
@@ -266,15 +242,17 @@ export default function InteractiveLoginBackground() {
       window.removeEventListener('mouseleave', handleLeave);
       window.removeEventListener('mousedown', handleDown);
       window.removeEventListener('mouseup', handleUp);
-      window.removeEventListener('resize', initGrid);
+      window.removeEventListener('resize', initEntities);
       cancelAnimationFrame(animationId);
     };
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 z-0 cursor-none"
-    />
+    <div className="fixed inset-0 z-0 bg-slate-50 overflow-hidden">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full cursor-none"
+      />
+    </div>
   );
 }

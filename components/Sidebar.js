@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -19,22 +19,48 @@ import {
 export default function Sidebar({ userName = "Admin", userRole = "USER", appName = "" }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-
-  // Filter menu items based on role
-  const menuItems = [
+  // Filter menu items based on role (memoized so array identity is stable)
+  const menuItems = useMemo(() => [
     { label: "Dashboard", href: "/", icon: LayoutDashboard, description: "Ringkasan & statistik" },
-    { label: "Data Pengguna", href: "/pengguna", icon: Users, description: "Kelola data karyawan" },
-    { label: "Input SPKL", href: "/spkl", icon: FileText, description: "Buat surat lembur" },
     { label: "Monitoring", href: "/monitoring", icon: BarChart3, description: "Pantau aset & stok" },
+    { label: "Input SPKL", href: "/spkl", icon: FileText, description: "Buat surat lembur" },
+    { label: "Data Pengguna", href: "/pengguna", icon: Users, description: "Kelola data karyawan" },
     ...(userRole === "ADMIN" ? [{ label: "Kelola Akun", href: "/akun", icon: ShieldCheck, description: "Manajemen akun login" }] : []),
     ...(userRole === "ADMIN" ? [{ label: "Pengaturan", href: "/settings", icon: Settings, description: "Konfigurasi sistem" }] : []),
-  ];
+  ], [userRole]);
 
-  async function handleLogout() {
+  const handleClose = useCallback(() => setIsOpen(false), []);
+
+  const handleLogout = useCallback(async () => {
     const { logout } = await import("@/lib/auth");
     await logout();
     window.location.href = "/login";
-  }
+  }, []);
+
+  // Menu item component — memoized to avoid unnecessary re-renders
+  const MenuItem = React.memo(function MenuItem({ item, isActive, onClose }) {
+    const Icon = item.icon;
+    return (
+      <Link
+        href={item.href}
+        onClick={onClose}
+        className={`
+          relative flex items-center gap-4 px-4 py-4 rounded-none border-[3px] border-black
+          transition-all duration-200 group
+          ${isActive
+            ? "bg-black text-white translate-x-[4px] translate-y-[4px] shadow-none"
+            : "bg-white text-black shadow-[6px_6px_0px_0px_#000] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_0px_#000]"
+          }
+        `}
+      >
+        <Icon size={22} className={`flex-shrink-0 stroke-[2.5px] ${isActive ? "text-white" : "text-black"}`} />
+        <div className="min-w-0">
+          <span className="block text-sm font-black uppercase tracking-wider truncate">{item.label}</span>
+          <span className={`block font-mono text-[10px] font-bold uppercase truncate mt-0.5 ${isActive ? "text-gray-300" : "text-gray-500"}`}>{item.description}</span>
+        </div>
+      </Link>
+    );
+  });
 
   return (
     <>
@@ -92,7 +118,7 @@ export default function Sidebar({ userName = "Admin", userRole = "USER", appName
                 {appName}
               </h1>
               <p className="font-mono text-[10px] font-bold text-gray-500 uppercase mt-1 tracking-wider">
-                Sistem Kerja Lembur
+                
               </p>
             </div>
           </div>
@@ -112,27 +138,8 @@ export default function Sidebar({ userName = "Admin", userRole = "USER", appName
           <div className="flex flex-col gap-1.5">
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
-              const Icon = item.icon;
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  className={`
-                    relative flex items-center gap-4 px-4 py-4 rounded-none border-[3px] border-black
-                    transition-all duration-200 group
-                    ${isActive
-                      ? "bg-black text-white translate-x-[4px] translate-y-[4px] shadow-none"
-                      : "bg-white text-black shadow-[6px_6px_0px_0px_#000] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[8px_8px_0px_0px_#000]"
-                    }
-                  `}
-                >
-                  <Icon size={22} className={`flex-shrink-0 stroke-[2.5px] ${isActive ? "text-white" : "text-black"}`} />
-                  <div className="min-w-0">
-                    <span className="block text-sm font-black uppercase tracking-wider truncate">{item.label}</span>
-                    <span className={`block font-mono text-[10px] font-bold uppercase truncate mt-0.5 ${isActive ? "text-gray-300" : "text-gray-500"}`}>{item.description}</span>
-                  </div>
-                </Link>
+                <MenuItem key={item.href} item={item} isActive={isActive} onClose={handleClose} />
               );
             })}
           </div>
@@ -162,7 +169,7 @@ export default function Sidebar({ userName = "Admin", userRole = "USER", appName
             onClick={handleLogout}
             className="neu-btn bg-red-100 border-black hover:bg-red-200 text-black py-2 w-full text-xs flex justify-center shadow-[2px_2px_0px_0px_#000] active:translate-y-[2px] active:translate-x-[2px] active:shadow-none transition-all"
           >
-            LOGOUT SISTEM
+            LOGOUT
           </button>
         </div>
       </aside>
