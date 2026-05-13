@@ -127,6 +127,8 @@ model Account {
 
   spkls Spkl[]
   todos Todo[]
+  elearningMaterials ElearningMaterial[]
+  elearningQuestions ElearningQuestion[]
 
   @@map("accounts")
 }
@@ -153,6 +155,8 @@ model Team {
   users         User[]
   todoTemplates TodoTemplate[]
   monitoringCategoryTeams MonitoringCategoryTeam[]
+  elearningMaterials ElearningMaterial[]
+  elearningQuestions ElearningQuestion[]
 
   @@map("teams")
 }
@@ -191,6 +195,50 @@ model TodoTemplate {
   team   Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   @@map("todo_templates")
+}
+
+// =============================================================
+// MODEL: ElearningMaterial (Materi E-Learning)
+// =============================================================
+model ElearningMaterial {
+  id            Int       @id @default(autoincrement())
+  title         String
+  description   String?   @db.Text
+  items         Json      @db.JsonB
+  accessStatus  String    @default("TEAM") // "TEAM" | "PRIVATE"
+  publicSlug    String?   @unique @map("public_slug") // null = belum di-share, terisi = link aktif
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  teamId    Int?    @map("team_id")
+  createdBy Int?    @map("created_by")
+
+  team    Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  creator Account? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("elearning_materials")
+}
+
+// =============================================================
+// MODEL: ElearningQuestion (Bank Soal E-Learning)
+// =============================================================
+model ElearningQuestion {
+  id            Int       @id @default(autoincrement())
+  question      String    @db.Text
+  answer        String    @db.Text
+  accessStatus  String    @default("TEAM") // "TEAM" | "PRIVATE"
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  teamId    Int?    @map("team_id")
+  createdBy Int?    @map("created_by")
+
+  team    Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  creator Account? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("elearning_questions")
 }
 
 // =============================================================

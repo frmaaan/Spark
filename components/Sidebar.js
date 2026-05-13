@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   UserCircle,
   BarChart3,
+  GraduationCap,
 } from "lucide-react";
 
 export default function Sidebar({ userName = "Admin", userRole = "USER", appName = "" }) {
@@ -24,6 +25,7 @@ export default function Sidebar({ userName = "Admin", userRole = "USER", appName
     { label: "Dashboard", href: "/", icon: LayoutDashboard, description: "Ringkasan & statistik" },
     { label: "Monitoring", href: "/monitoring", icon: BarChart3, description: "Pantau aset & stok" },
     { label: "Input SPKL", href: "/spkl", icon: FileText, description: "Buat surat lembur" },
+    { label: "Bank Soal", href: "/bank-soal", icon: GraduationCap, description: "Soal & jawaban e-learning" },
     { label: "Data Pengguna", href: "/pengguna", icon: Users, description: "Kelola data karyawan" },
     ...(userRole === "ADMIN" ? [{ label: "Kelola Akun", href: "/akun", icon: ShieldCheck, description: "Manajemen akun login" }] : []),
     ...(userRole === "ADMIN" ? [{ label: "Pengaturan", href: "/settings", icon: Settings, description: "Konfigurasi sistem" }] : []),
@@ -161,9 +163,9 @@ export default function Sidebar({ userName = "Admin", userRole = "USER", appName
                 </span>
               </div>
             </Link>
-            <span className="font-mono text-[10px] font-bold bg-black text-white px-2 py-1 border-2 border-black flex-shrink-0">
+            {/* <span className="font-mono text-[10px] font-bold bg-black text-white px-2 py-1 border-2 border-black flex-shrink-0">
               v.01.0.0
-            </span>
+            </span> */}
           </div>
           <button
             onClick={handleLogout}

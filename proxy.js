@@ -4,6 +4,9 @@ import { decrypt } from "@/lib/session";
 // Daftar route yang TIDAK perlu login
 const publicRoutes = ["/login", "/register"];
 
+// Prefix route yang TIDAK perlu login (semua sub-path ikut dibebaskan)
+const publicPrefixes = ["/p/"];
+
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -18,7 +21,10 @@ export async function proxy(request) {
   }
 
   // Cek apakah route saat ini adalah route publik
-  const isPublicRoute = publicRoutes.includes(pathname);
+  const isPublicRoute =
+    publicRoutes.includes(pathname) ||
+    publicPrefixes.some((prefix) => pathname.startsWith(prefix));
+
 
   // Ambil token dari cookie
   const token = request.cookies.get("auth_token")?.value;
