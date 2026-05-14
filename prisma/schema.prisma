@@ -131,6 +131,7 @@ model Account {
   todos Todo[]
   elearningMaterials ElearningMaterial[]
   elearningQuestions ElearningQuestion[]
+  schedules          Schedule[]
 
   @@map("accounts")
 }
@@ -160,6 +161,7 @@ model Team {
   monitoringCategoryTeams MonitoringCategoryTeam[]
   elearningMaterials ElearningMaterial[]
   elearningQuestions ElearningQuestion[]
+  schedules          Schedule[]
 
   @@map("teams")
 }
@@ -342,7 +344,48 @@ model MonitoringTransaction {
 
   item      MonitoringItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("monitoring_transactions")
+}
+
+// =============================================================
+// MODEL: Schedule (Header Jadwal Shift Bulanan)
+// =============================================================
+// Satu record = satu tim, satu bulan
+// publicSlug digunakan untuk link share publik (/s/:slug)
+// =============================================================
+model Schedule {
+  id             Int       @id @default(autoincrement())
+  teamId         Int?      @map("team_id")
+  createdBy      Int?      @map("created_by")
+  monthStartDate DateTime  @map("month_start_date") // Selalu tanggal 1, misal 2026-05-01
+  publicSlug     String?   @unique @map("public_slug") // null = belum di-share
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  team    Team?        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  creator Account?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  rows    ScheduleRow[]
+
+  @@map("schedules")
+}
+
+// =============================================================
+// MODEL: ScheduleRow (Jadwal Shift Per Karyawan)
+// =============================================================
+// Shifts disimpan sebagai JSON: { "d01": "P6", "d02": "OFF", ... }
+// nomorFinger dipakai untuk mencocokkan dengan User
+// namaKaryawan diambil langsung dari kolom schedule_type di Excel
+// =============================================================
+model ScheduleRow {
+  id           Int    @id @default(autoincrement())
+  scheduleId   Int    @map("schedule_id")
+  nomorFinger  String @map("nomor_finger") // = group_id di Excel
+  namaKaryawan String @map("nama_karyawan") // = schedule_type di Excel
+  shifts       Json   @db.JsonB // { "d01": "P6", "d02": "OFF", "d03": "S14", ... }
+
+  schedule Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@map("schedule_rows")
 }

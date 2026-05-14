@@ -15,6 +15,7 @@ import {
   UserCircle,
   BarChart3,
   GraduationCap,
+  CalendarDays,
 } from "lucide-react";
 
 export default function Sidebar({ userName = "Admin", userRole = "USER", appName = "" }) {
@@ -26,6 +27,7 @@ export default function Sidebar({ userName = "Admin", userRole = "USER", appName
     { label: "Monitoring", href: "/monitoring", icon: BarChart3, description: "Pantau aset & stok" },
     { label: "Input SPKL", href: "/spkl", icon: FileText, description: "Buat surat lembur" },
     { label: "Bank Soal", href: "/bank-soal", icon: GraduationCap, description: "Soal & jawaban e-learning" },
+    ...(userRole === "ADMIN" ? [{ label: "Jadwal Shift", href: "/jadwal", icon: CalendarDays, description: "Kelola jadwal shift" }] : []),
     { label: "Data Pengguna", href: "/pengguna", icon: Users, description: "Kelola data karyawan" },
     ...(userRole === "ADMIN" ? [{ label: "Kelola Akun", href: "/akun", icon: ShieldCheck, description: "Manajemen akun login" }] : []),
     ...(userRole === "ADMIN" ? [{ label: "Pengaturan", href: "/settings", icon: Settings, description: "Konfigurasi sistem" }] : []),

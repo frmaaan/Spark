@@ -5,7 +5,7 @@ import { decrypt } from "@/lib/session";
 const publicRoutes = ["/login", "/register"];
 
 // Prefix route yang TIDAK perlu login (semua sub-path ikut dibebaskan)
-const publicPrefixes = ["/p/"];
+const publicPrefixes = ["/p/", "/s/"];
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
