@@ -68,8 +68,10 @@ model Spkl {
   createdAt DateTime @default(now()) @map("created_at")
   status    String   @default("DRAFT") // "DRAFT" | "FINAL"
   accountId Int?     @map("account_id") // ID dari Account pembuat SPKL
+  teamId    Int?     @map("team_id")
 
   account Account? @relation(fields: [accountId], references: [id])
+  team    Team?    @relation(fields: [teamId], references: [id])
 
   // RELASI: Satu SPKL punya banyak baris
   rows SpklRow[]
@@ -153,6 +155,7 @@ model Team {
   accounts      Account[] // Berubah jadi jamak (accounts)
   todos         Todo[]
   users         User[]
+  spkls         Spkl[]
   todoTemplates TodoTemplate[]
   monitoringCategoryTeams MonitoringCategoryTeam[]
   elearningMaterials ElearningMaterial[]

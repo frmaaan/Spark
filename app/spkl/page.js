@@ -13,6 +13,7 @@ export default function SpklPage() {
   const [users, setUsers] = useState([]);
   const [spklList, setSpklList] = useState([]);
   const [userRole, setUserRole] = useState("USER");
+  const [currentAccountId, setCurrentAccountId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   
@@ -35,6 +36,7 @@ export default function SpklPage() {
     if (spklResult.success) {
       setSpklList(spklResult.data);
       setUserRole(spklResult.role);
+      setCurrentAccountId(spklResult.currentAccountId || null);
     }
     setLoading(false);
   }
@@ -128,6 +130,7 @@ export default function SpklPage() {
       <SpklHistory 
         spklList={spklList}
         userRole={userRole}
+        currentAccountId={currentAccountId}
         loading={loading}
         onEdit={handleEditDraft}
         onDelete={handleDeleteSpkl}

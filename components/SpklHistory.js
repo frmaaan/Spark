@@ -6,7 +6,7 @@ import { exportSpklToExcel } from "@/lib/excelExport";
 
 import ConfirmModal from "./ConfirmModal";
 
-export default function SpklHistory({ spklList, userRole, loading, onEdit, onDelete }) {
+export default function SpklHistory({ spklList, userRole, currentAccountId, loading, onEdit, onDelete }) {
   const [deletingId, setDeletingId] = useState(null);
   const [filterMonth, setFilterMonth] = useState("ALL");
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
@@ -195,7 +195,7 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
                   </td>
                   <td className="px-8 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {isDraft ? (
+                      {isDraft && (userRole === "ADMIN" || spkl.accountId === currentAccountId) ? (
                         <button
                           onClick={() => onEdit(spkl)}
                           className="neu-btn bg-yellow-400 border-text-dark text-text-dark text-xs px-3 py-1.5 hover:bg-yellow-500"
@@ -213,7 +213,7 @@ export default function SpklHistory({ spklList, userRole, loading, onEdit, onDel
                         </button>
                       )}
 
-                      {(isDraft || userRole === "ADMIN") && (
+                      {(userRole === "ADMIN" || spkl.accountId === currentAccountId) && (
                         <button
                           onClick={() => openConfirmDelete(spkl.id)}
                           disabled={deletingId === spkl.id}
