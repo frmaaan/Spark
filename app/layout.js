@@ -3,7 +3,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import DonationModal from "@/components/DonationModal";
 import AutoLogout from "@/components/AutoLogout";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { getSettings } from "@/lib/actions/settingActions";
 
@@ -31,14 +31,19 @@ export const viewport = {
 };
 
 export default async function RootLayout({ children }) {
+  const headerStore = await headers();
+  const pathname = headerStore.get("x-pathname") ?? "";
+
   const cookieStore = await cookies();
   const token = cookieStore.get("auth_token")?.value;
   const session = token ? await decrypt(token) : null;
   const isLoggedIn = !!session;
+  const isPublicPreviewRoute = pathname.startsWith("/s/") || pathname.startsWith("/p/");
+  const useAppShell = isLoggedIn && !isPublicPreviewRoute;
 
   // Fetch settings for Donation Modal if logged in
   let settings = null;
-  if (isLoggedIn) {
+  if (useAppShell) {
     const settingsResult = await getSettings();
     if (settingsResult.success) {
       settings = settingsResult.data;
@@ -48,7 +53,7 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="id" className={`${inter.variable} h-full`}>
       <body className="bg-surface font-sans antialiased text-black" suppressHydrationWarning={true}>
-        {isLoggedIn ? (
+        {useAppShell ? (
           <div className="min-h-screen flex flex-col md:flex-row">
             <AutoLogout />
             <Sidebar userName={session?.nama} userRole={session?.role} appName={settings?.app_name} />
@@ -73,7 +78,7 @@ export default async function RootLayout({ children }) {
             </main>
           </div>
         ) : (
-          <main className="min-h-screen flex items-center justify-center bg-surface p-6">
+          <main className={isPublicPreviewRoute ? "min-h-screen bg-surface" : "min-h-screen flex items-center justify-center bg-surface p-6"}>
             {children}
           </main>
         )}

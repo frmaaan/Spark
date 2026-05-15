@@ -10,6 +10,8 @@ const SHIFT_MAP = {
   "SHIFT 10": "P10",
   "SHIFT 14": "S14",
   "SHIFT 15": "S15",
+  "CUTI":     "CT",
+  "CT":       "CT",
   "OFF":      "OFF",
 };
 
@@ -19,8 +21,9 @@ const IGNORED_COLS = new Set(["ShfPrdCgn1", "ShfPrdCgn2", "ShfPrdCgn3", "count s
 
 function mapShift(raw) {
   if (!raw) return "";
-  const val = String(raw).trim();
-  return SHIFT_MAP[val] ?? val;
+  const val = String(raw).trim().toUpperCase().replace(/\s+/g, " ");
+  const canonical = val.replace(/[:.;,]+$/g, "");
+  return SHIFT_MAP[canonical] ?? canonical;
 }
 
 export async function POST(request) {

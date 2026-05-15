@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getScheduleBySlug } from "@/lib/actions/scheduleActions";
+import { getSession } from "@/lib/session";
 import SchedulePublicView from "@/components/SchedulePublicView";
 
 export async function generateMetadata({ params }) {
@@ -17,5 +18,9 @@ export default async function SchedulePublicPage({ params }) {
   const { slug } = await params;
   const result = await getScheduleBySlug(slug);
   if (!result.success) notFound();
-  return <SchedulePublicView schedule={result.data} />;
+
+  const session = await getSession();
+  const userRole = session?.role ?? null;
+
+  return <SchedulePublicView schedule={result.data} userRole={userRole} />;
 }

@@ -32,10 +32,12 @@ function isSunday(dateStr, dayNum) {
 const SHIFT_COLORS = {
   P6:  "bg-[#fef9c3] text-yellow-800",
   P7:  "bg-[#fef9c3] text-yellow-800",
+  P8:  "bg-[#fef9c3] text-yellow-800",
   P10: "bg-[#fef9c3] text-yellow-800",
   S14: "bg-[#dbeafe] text-blue-800",
   S15: "bg-[#dbeafe] text-blue-800",
   OFF: "text-red-600 font-black",
+  CT: "text-green-600 font-black",
   "":  "text-gray-300",
 };
 
@@ -173,7 +175,7 @@ export default function ScheduleUploader() {
               </thead>
               <tbody>
                 <tr className="bg-gray-50">
-                  {["001","Budi S.","2026-05-01","SHIFT 6","OFF","...","SHIFT 14"].map((v, i) => (
+                  {["001","Lionel Messi","2026-05-01","SHIFT 6","OFF","...","SHIFT 14"].map((v, i) => (
                     <td key={i} className="px-3 py-2 border border-gray-200">{v}</td>
                   ))}
                 </tr>

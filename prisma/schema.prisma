@@ -1,144 +1,71 @@
-// =============================================================
-// 📚 PRISMA SCHEMA — Definisi Struktur Database
-// =============================================================
-// 
-// KONSEP: Prisma Schema adalah "blueprint" database kamu.
-// Di sini kita mendefinisikan:
-//   1. Generator  → Bagaimana Prisma menghasilkan kode client
-//   2. Datasource → Database apa yang dipakai (SQLite)
-//   3. Model      → Tabel-tabel di database
-//
-// Prisma akan membaca file ini dan:
-//   - Membuat tabel di database (migration)
-//   - Menghasilkan TypeScript/JS client untuk query data
-//
-// ANALOGI: Seperti CREATE TABLE di SQL, tapi lebih readable
-// =============================================================
-
 generator client {
   provider = "prisma-client-js"
-  // output   = "../app/generated/prisma"
-  // output → Lokasi dimana Prisma Client di-generate
-  // Kita taruh di app/generated agar mudah diakses
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-// =============================================================
-// MODEL: User (Tabel Pengguna)
-// =============================================================
-// Menyimpan data karyawan: Nomor Finger, NIP/NIK, dan Nama
-//
-// KONSEP:
-// - @id          → Primary key (identitas unik setiap record)
-// - @default     → Nilai default saat record dibuat
-// - autoincrement() → ID otomatis bertambah (1, 2, 3, ...)
-// - @unique      → Tidak boleh ada duplikat
-// - @map         → Nama kolom di database (bisa beda dari nama field)
-// - @@map        → Nama tabel di database
-// =============================================================
 model User {
   id          Int       @id @default(autoincrement())
   nomorFinger String    @unique @map("nomor_finger")
-  nip         String    @unique // NIP atau NIK karyawan
-  nama        String // Nama lengkap karyawan
+  nip         String    @unique
+  nama        String
   createdAt   DateTime  @default(now()) @map("created_at")
-  deletedAt   DateTime? @map("deleted_at") // null = aktif, terisi = sudah dihapus (soft delete)
-  accountId   Int?      @map("account_id") // ID dari Account pembuat data
+  deletedAt   DateTime? @map("deleted_at")
+  accountId   Int?      @map("account_id")
+  teamId      Int?
+  spklRows    SpklRow[]
+  team        Team?     @relation(fields: [teamId], references: [id])
 
-  // RELASI: Satu user bisa punya banyak baris SPKL
-  // Ini disebut "One-to-Many Relationship"
-  spklRows SpklRow[]
-  teamId   Int?
-  team     Team?     @relation(fields: [teamId], references: [id])
-
-  @@map("users") // Nama tabel di database = "users"
+  @@map("users")
 }
 
-// =============================================================
-// MODEL: Spkl (Tabel Surat Perintah Kerja Lembur)
-// =============================================================
-// Menyimpan header SPKL (tanggal dibuat)
-// Satu SPKL bisa punya banyak baris detail (SpklRow)
-// =============================================================
 model Spkl {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now()) @map("created_at")
-  status    String   @default("DRAFT") // "DRAFT" | "FINAL"
-  accountId Int?     @map("account_id") // ID dari Account pembuat SPKL
-  teamId    Int?     @map("team_id")
-
-  account Account? @relation(fields: [accountId], references: [id])
-  team    Team?    @relation(fields: [teamId], references: [id])
-
-  // RELASI: Satu SPKL punya banyak baris
-  rows SpklRow[]
+  id        Int       @id @default(autoincrement())
+  createdAt DateTime  @default(now()) @map("created_at")
+  status    String    @default("DRAFT")
+  accountId Int?      @map("account_id")
+  teamId    Int?      @map("team_id")
+  account   Account?  @relation(fields: [accountId], references: [id])
+  team      Team?     @relation(fields: [teamId], references: [id])
+  rows      SpklRow[]
 
   @@map("spkl")
 }
 
-// =============================================================
-// MODEL: SpklRow (Tabel Detail Baris SPKL)
-// =============================================================
-// Setiap baris berisi: Siapa (user), Kapan (tanggal), Apa (keterangan)
-//
-// KONSEP RELASI:
-// - userId → Foreign Key ke tabel User
-// - spklId → Foreign Key ke tabel Spkl
-// - @relation → Mendefinisikan hubungan antar tabel
-//   - fields: [userId]    → Kolom di tabel ini yang jadi FK
-//   - references: [id]    → Kolom di tabel target yang dirujuk
-// =============================================================
 model SpklRow {
-  id Int @id @default(autoincrement())
-
-  userId Int  @map("user_id")
-  user   User @relation(fields: [userId], references: [id])
-  // ^ Relasi ke User: "baris ini milik user dengan id = userId"
-
-  spklId Int  @map("spkl_id")
-  spkl   Spkl @relation(fields: [spklId], references: [id], onDelete: Cascade)
-  // ^ Relasi ke Spkl: "baris ini bagian dari SPKL dengan id = spklId"
-  // onDelete: Cascade → Jika SPKL dihapus, semua barisnya ikut terhapus
-
-  tanggal    String // Format: YYYY-MM-DD
-  keterangan String // Deskripsi pekerjaan lembur
-
-  createdAt DateTime @default(now()) @map("created_at")
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  spklId     Int      @map("spkl_id")
+  tanggal    String
+  keterangan String
+  createdAt  DateTime @default(now()) @map("created_at")
+  spkl       Spkl     @relation(fields: [spklId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id])
 
   @@map("spkl_rows")
 }
 
-// =============================================================
-// MODEL: Account (Tabel Akun Login)
-// =============================================================
-// Menyimpan data pengguna yang memiliki akses login ke sistem
-// =============================================================
 model Account {
-  id        Int      @id @default(autoincrement())
-  nama      String // Nama pengguna untuk ditampilkan di sidebar
-  username  String   @unique
-  password  String // Akan disimpan dalam bentuk hash (bcrypt)
-  role      String   @default("USER") // "ADMIN" atau "USER"
-  createdAt DateTime @default(now()) @map("created_at")
-
-  teamId Int?  @map("team_id")
-  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  spkls Spkl[]
-  todos Todo[]
+  id                 Int                 @id @default(autoincrement())
+  nama               String
+  username           String              @unique
+  password           String
+  role               String              @default("USER")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  teamId             Int?                @map("team_id")
+  team               Team?               @relation(fields: [teamId], references: [id], onDelete: Cascade)
   elearningMaterials ElearningMaterial[]
   elearningQuestions ElearningQuestion[]
+  schedule_changes   schedule_changes[]
   schedules          Schedule[]
+  spkls              Spkl[]
+  todos              Todo[]
 
   @@map("accounts")
 }
 
-// =============================================================
-// MODEL: Setting (Pengaturan Sistem Dinamis)
-// =============================================================
 model Setting {
   key   String @id
   value String
@@ -146,113 +73,86 @@ model Setting {
   @@map("settings")
 }
 
-// =============================================================
-// MODEL: Team (Tabel Tim Kolaborasi)
-// =============================================================
 model Team {
-  id   Int    @id @default(autoincrement())
-  nama String @unique // contoh: "Tim IT", "Tim Gudang"
-
-  accounts      Account[] // Berubah jadi jamak (accounts)
-  todos         Todo[]
-  users         User[]
-  spkls         Spkl[]
-  todoTemplates TodoTemplate[]
+  id                      Int                      @id @default(autoincrement())
+  nama                    String                   @unique
+  accounts                Account[]
+  elearningMaterials      ElearningMaterial[]
+  elearningQuestions      ElearningQuestion[]
   monitoringCategoryTeams MonitoringCategoryTeam[]
-  elearningMaterials ElearningMaterial[]
-  elearningQuestions ElearningQuestion[]
-  schedules          Schedule[]
+  schedules               Schedule[]
+  spkls                   Spkl[]
+  todoTemplates           TodoTemplate[]
+  todos                   Todo[]
+  users                   User[]
 
   @@map("teams")
 }
 
-// =============================================================
-// MODEL: Todo (Tabel To-Do List)
-// =============================================================
 model Todo {
-  id          Int     @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   task        String
-  description String? @db.Text
-  status      String  @default("TODO") // "TODO" | "IN_PROGRESS" | "DONE"
-  tipe        String  @default("PERSONAL") // "PERSONAL" | "TEAM"
-
-  authorId Int     @map("author_id")
-  author   Account @relation(fields: [authorId], references: [id], onDelete: Cascade)
-
-  teamId Int?  @map("team_id")
-  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now()) @map("created_at")
+  tipe        String   @default("PERSONAL")
+  authorId    Int      @map("author_id")
+  teamId      Int?     @map("team_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  description String?
+  status      String   @default("TODO")
+  author      Account  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@map("todos")
 }
 
-// =============================================================
-// MODEL: TodoTemplate (Template Checklist dari Admin)
-// =============================================================
 model TodoTemplate {
   id        Int      @id @default(autoincrement())
-  title     String // Judul template: "Checklist Harian Gudang"
-  items     String   @db.Text // JSON array: ["Cek stok", "Update inventaris", ...]
+  title     String
+  items     String
   createdAt DateTime @default(now()) @map("created_at")
-
-  teamId Int?  @map("team_id")
-  team   Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  teamId    Int?     @map("team_id")
+  team      Team?    @relation(fields: [teamId], references: [id])
 
   @@map("todo_templates")
 }
 
-// =============================================================
-// MODEL: ElearningMaterial (Materi E-Learning)
-// =============================================================
 model ElearningMaterial {
-  id            Int       @id @default(autoincrement())
-  title         String
-  description   String?   @db.Text
-  items         Json      @db.JsonB
-  accessStatus  String    @default("TEAM") // "TEAM" | "PRIVATE"
-  publicSlug    String?   @unique @map("public_slug") // null = belum di-share, terisi = link aktif
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
-
-  teamId    Int?    @map("team_id")
-  createdBy Int?    @map("created_by")
-
-  team    Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  creator Account? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  id           Int       @id @default(autoincrement())
+  title        String
+  description  String?
+  items        Json
+  accessStatus String    @default("TEAM")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  teamId       Int?      @map("team_id")
+  createdBy    Int?      @map("created_by")
+  publicSlug   String?   @unique @map("public_slug")
+  creator      Account?  @relation(fields: [createdBy], references: [id])
+  team         Team?     @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@map("elearning_materials")
 }
 
-// =============================================================
-// MODEL: ElearningQuestion (Bank Soal E-Learning)
-// =============================================================
 model ElearningQuestion {
-  id            Int       @id @default(autoincrement())
-  question      String    @db.Text
-  answer        String    @db.Text
-  accessStatus  String    @default("TEAM") // "TEAM" | "PRIVATE"
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
-
-  teamId    Int?    @map("team_id")
-  createdBy Int?    @map("created_by")
-
-  team    Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  creator Account? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  id           Int       @id @default(autoincrement())
+  question     String
+  answer       String
+  accessStatus String    @default("TEAM")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  teamId       Int?      @map("team_id")
+  createdBy    Int?      @map("created_by")
+  creator      Account?  @relation(fields: [createdBy], references: [id])
+  team         Team?     @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@map("elearning_questions")
 }
 
-// =============================================================
-// MODEL: TodoHistory (Snapshot dari sebuah periode, disimpan saat midnight)
-// =============================================================
 model TodoHistory {
   id        Int      @id @default(autoincrement())
-  title     String // Judul snapshot, mis. "Snapshot 2026-04-29"
-  items     String   @db.Text // JSON array of todo objects
+  title     String
+  items     String
   authorId  Int?     @map("author_id")
   teamId    Int?     @map("team_id")
   createdAt DateTime @default(now()) @map("created_at")
@@ -260,132 +160,108 @@ model TodoHistory {
   @@map("todo_histories")
 }
 
-// =============================================================
-// MODEL: MonitoringCategory (Kategori Papan Monitoring)
-// =============================================================
 model MonitoringCategory {
-  id        Int      @id @default(autoincrement())
-  nama      String   @unique
-  
-  items     MonitoringItem[]
+  id            Int                      @id @default(autoincrement())
+  nama          String                   @unique
+  createdAt     DateTime                 @default(now()) @map("created_at")
   categoryTeams MonitoringCategoryTeam[]
-  
-  createdAt DateTime @default(now()) @map("created_at")
+  items         MonitoringItem[]
 
   @@map("monitoring_categories")
 }
 
-// =============================================================
-// MODEL: MonitoringItem (Produk/Barang yang dimonitor)
-// =============================================================
 model MonitoringItem {
-  id           Int      @id @default(autoincrement())
-  categoryId   Int      @map("category_id")
-  kode         String   @unique
+  id           Int                     @id @default(autoincrement())
+  categoryId   Int                     @map("category_id")
+  kode         String                  @unique
   nama         String
-  stokAwal     Int      @default(0) @map("stok_awal")
-  
-  category     MonitoringCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  stokAwal     Int                     @default(0) @map("stok_awal")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  category     MonitoringCategory      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   transactions MonitoringTransaction[]
-
-  createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("monitoring_items")
 }
 
-// Join table: many-to-many between MonitoringCategory and Team
 model MonitoringCategoryTeam {
-  id          Int @id @default(autoincrement())
-  categoryId  Int @map("category_id")
-  teamId      Int @map("team_id")
-
-  category    MonitoringCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  team        Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  id         Int                @id @default(autoincrement())
+  categoryId Int                @map("category_id")
+  teamId     Int                @map("team_id")
+  category   MonitoringCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  team       Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, teamId])
   @@map("monitoring_category_teams")
 }
 
-// =============================================================
-// MODEL: MonitoringLocation (Lokasi/Gudang Penyimpanan)
-// =============================================================
 model MonitoringLocation {
-  id        Int      @id @default(autoincrement())
-  nama      String   @unique
-  
-  transactions MonitoringTransaction[] @relation("LocationTransactions")
+  id                Int                     @id @default(autoincrement())
+  nama              String                  @unique
+  createdAt         DateTime                @default(now()) @map("created_at")
+  transactions      MonitoringTransaction[] @relation("LocationTransactions")
   incomingTransfers MonitoringTransaction[] @relation("IncomingTransfers")
-
-  createdAt DateTime @default(now()) @map("created_at")
 
   @@map("monitoring_locations")
 }
 
-// =============================================================
-// MODEL: MonitoringTransaction (Riwayat Mutasi In/Out/Transfer)
-// =============================================================
 model MonitoringTransaction {
-  id        Int      @id @default(autoincrement())
-  itemId    Int      @map("item_id")
-  
-  tipe      String   // Wajib bernilai "IN", "OUT", atau "TRANSFER"
-  qty       Int
-  tanggal   DateTime
-  catatan   String?  @db.Text
-  
-  locationId Int?    @map("location_id")
-  location   MonitoringLocation? @relation("LocationTransactions", fields: [locationId], references: [id], onDelete: Cascade)
-
-  toLocationId Int?  @map("to_location_id") // Tujuan untuk TRANSFER
+  id           Int                 @id @default(autoincrement())
+  itemId       Int                 @map("item_id")
+  tipe         String
+  qty          Int
+  tanggal      DateTime
+  catatan      String?
+  createdAt    DateTime            @default(now()) @map("created_at")
+  locationId   Int?                @map("location_id")
+  toLocationId Int?                @map("to_location_id")
+  item         MonitoringItem      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  location     MonitoringLocation? @relation("LocationTransactions", fields: [locationId], references: [id], onDelete: Cascade)
   toLocation   MonitoringLocation? @relation("IncomingTransfers", fields: [toLocationId], references: [id], onDelete: Cascade)
-
-  // Opsional: Lacak siapa yang menginput
-  // authorId Int?     @map("author_id")
-
-  item      MonitoringItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-
-  createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("monitoring_transactions")
 }
 
-// =============================================================
-// MODEL: Schedule (Header Jadwal Shift Bulanan)
-// =============================================================
-// Satu record = satu tim, satu bulan
-// publicSlug digunakan untuk link share publik (/s/:slug)
-// =============================================================
 model Schedule {
-  id             Int       @id @default(autoincrement())
-  teamId         Int?      @map("team_id")
-  createdBy      Int?      @map("created_by")
-  monthStartDate DateTime  @map("month_start_date") // Selalu tanggal 1, misal 2026-05-01
-  publicSlug     String?   @unique @map("public_slug") // null = belum di-share
-  createdAt      DateTime  @default(now()) @map("created_at")
-  deletedAt      DateTime? @map("deleted_at")
-
-  team    Team?        @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  creator Account?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
-  rows    ScheduleRow[]
+  id               Int                @id @default(autoincrement())
+  teamId           Int?               @map("team_id")
+  createdBy        Int?               @map("created_by")
+  monthStartDate   DateTime           @map("month_start_date")
+  publicSlug       String?            @unique @map("public_slug")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  deletedAt        DateTime?          @map("deleted_at")
+  schedule_changes schedule_changes[]
+  rows             ScheduleRow[]
+  creator          Account?           @relation(fields: [createdBy], references: [id])
+  team             Team?              @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@map("schedules")
 }
 
-// =============================================================
-// MODEL: ScheduleRow (Jadwal Shift Per Karyawan)
-// =============================================================
-// Shifts disimpan sebagai JSON: { "d01": "P6", "d02": "OFF", ... }
-// nomorFinger dipakai untuk mencocokkan dengan User
-// namaKaryawan diambil langsung dari kolom schedule_type di Excel
-// =============================================================
 model ScheduleRow {
-  id           Int    @id @default(autoincrement())
-  scheduleId   Int    @map("schedule_id")
-  nomorFinger  String @map("nomor_finger") // = group_id di Excel
-  namaKaryawan String @map("nama_karyawan") // = schedule_type di Excel
-  shifts       Json   @db.JsonB // { "d01": "P6", "d02": "OFF", "d03": "S14", ... }
-
-  schedule Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  id               Int                @id @default(autoincrement())
+  scheduleId       Int                @map("schedule_id")
+  nomorFinger      String             @map("nomor_finger")
+  namaKaryawan     String             @map("nama_karyawan")
+  shifts           Json
+  version          Int                @default(1)
+  schedule_changes schedule_changes[]
+  schedule         Schedule           @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
   @@map("schedule_rows")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model schedule_changes {
+  id            Int         @id @default(autoincrement())
+  schedule_id   Int
+  row_id        Int
+  day           Int
+  old_value     String?
+  new_value     String
+  changed_by    Int?
+  reason        String?
+  created_at    DateTime    @default(now())
+  accounts      Account?    @relation(fields: [changed_by], references: [id])
+  schedule_rows ScheduleRow @relation(fields: [row_id], references: [id], onDelete: Cascade)
+  schedules     Schedule    @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
 }
