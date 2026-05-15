@@ -36,7 +36,7 @@ export async function proxy(request) {
   const session = token ? await decrypt(token) : null;
 
   // Jika belum login & mengakses halaman yang diproteksi
-  if (!session && !isPublicRoute) {
+  if (!session && !isPublicRoute && !isAuthRoute) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }

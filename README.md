@@ -2,6 +2,16 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Set environment variables first (especially for production security):
+
+```bash
+SESSION_SECRET=replace-with-a-long-random-secret
+```
+
+Notes:
+- In development, app still runs without `SESSION_SECRET` using a dev fallback secret.
+- In production, `SESSION_SECRET` is required and app will fail to start if missing.
+
 First, run the development server:
 
 ```bash
