@@ -9,8 +9,9 @@ const publicPrefixes = ["/p/", "/s/"];
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
+  const normalizedPathname = pathname !== "/" ? pathname.replace(/\/+$/, "") : "/";
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-pathname", pathname);
+  requestHeaders.set("x-pathname", normalizedPathname);
 
   // Lewati pengecekan untuk file statis, API, dan Next.js internal
   if (
@@ -27,8 +28,8 @@ export async function proxy(request) {
   }
 
   // Cek apakah route saat ini adalah route publik
-  const isAuthRoute = authRoutes.includes(pathname);
-  const isPublicRoute = publicPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const isAuthRoute = authRoutes.includes(normalizedPathname);
+  const isPublicRoute = publicPrefixes.some((prefix) => normalizedPathname.startsWith(prefix));
 
 
   // Ambil token dari cookie
@@ -37,6 +38,15 @@ export async function proxy(request) {
 
   // Jika belum login & mengakses halaman yang diproteksi
   if (!session && !isPublicRoute && !isAuthRoute) {
+    // Hindari redirect ke URL yang sama jika ada normalisasi path di edge/CDN.
+    if (normalizedPathname === "/login") {
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      });
+    }
+
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
