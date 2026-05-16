@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { Download, Users } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Download, Users, Barcode } from "lucide-react";
 
-const MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const MONTHS_ID = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
 const DAYS_ID = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 function formatMonth(dateStr) {
@@ -85,6 +88,7 @@ function isDailyWorker(row) {
 }
 
 export default function SchedulePublicAdminView({ schedule }) {
+  const [showBarcode, setShowBarcode] = useState(true);
   const totalDays = daysInMonth(schedule.monthStartDate);
   const today = useMemo(() => getToday(schedule.monthStartDate), [schedule.monthStartDate]);
 
@@ -124,6 +128,20 @@ export default function SchedulePublicAdminView({ schedule }) {
     window.print();
   }, []);
 
+  const schedulePublicUrl = useMemo(() => {
+    return (
+      schedule.publicUrl ||
+      schedule.shareUrl ||
+      schedule.link ||
+      (typeof window !== "undefined" ? window.location.href : "")
+    );
+  }, [schedule]);
+
+  const qrUrl = useMemo(() => {
+    if (!schedulePublicUrl) return "";
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(schedulePublicUrl)}`;
+  }, [schedulePublicUrl]);
+
   return (
     <>
       <style>{`
@@ -138,11 +156,27 @@ export default function SchedulePublicAdminView({ schedule }) {
           body { background: white; }
           .team-print-root { padding: 0 !important; }
           .team-print-main { gap: 4px !important; }
-          .team-print-bottom-grid {
+          .team-print-bottom-grid.with-barcode {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 34mm;
+            gap: 4px !important;
+            align-items: stretch !important;
+          }
+          .team-print-bottom-grid.without-barcode {
             display: grid !important;
             grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
             gap: 4px !important;
-            align-items: start !important;
+            align-items: stretch !important;
+          }
+          .team-print-qr img {
+            width: 28mm !important;
+            height: 28mm !important;
+            padding: 1.5mm !important;
+          }
+          .team-print-qr-text {
+            font-size: 6px !important;
+            line-height: 1.2 !important;
+            margin-top: 3px !important;
           }
           .team-print-bottom-grid > * {
             min-width: 0 !important;
@@ -231,17 +265,39 @@ export default function SchedulePublicAdminView({ schedule }) {
           {/* Header bar — no print */}
           <div className="no-print bg-white border-[3px] border-black rounded-2xl shadow-[6px_6px_0px_0px_#000] p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Preview Jadwal Admin</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">
+                  Preview Jadwal Admin
+                </p>
                 <h1 className="text-2xl font-black uppercase">{schedule.teamName}</h1>
-                <p className="text-sm font-bold text-gray-500">{formatMonth(schedule.monthStartDate)}</p>
+                <p className="text-sm font-bold text-gray-500">
+                  {formatMonth(schedule.monthStartDate)}
+                </p>
               </div>
-              <button
-                onClick={handlePrint}
-                className="inline-flex items-center gap-2 bg-[#fde047] border-[2px] border-black rounded-lg font-black uppercase text-xs px-4 py-2 hover:bg-[#facc15] transition-colors shadow-[2px_2px_0px_0px_#000]"
-              >
-                <Download size={14} /> Download PDF
-              </button>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBarcode((value) => !value)}
+                  className={`inline-flex items-center justify-center gap-2 border-[2px] border-black rounded-lg font-black uppercase text-xs px-4 py-2 transition-colors shadow-[2px_2px_0px_0px_#000] ${
+                    showBarcode
+                      ? "bg-green-200 hover:bg-green-300"
+                      : "bg-gray-200 hover:bg-gray-300"
+                  }`}
+                >
+                  <Barcode size={14} /> {showBarcode ? "Hide" : "Show"} Barcode
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="inline-flex items-center gap-2 bg-[#fde047] border-[2px] border-black rounded-lg font-black uppercase text-xs px-4 py-2 hover:bg-[#facc15] transition-colors shadow-[2px_2px_0px_0px_#000]"
+                >
+                  <Download size={14} /> Download PDF
+                </button>
+              </div>
+              
             </div>
           </div>
 
@@ -317,7 +373,13 @@ export default function SchedulePublicAdminView({ schedule }) {
           </div>
 
           {/* ② SPKL | Tanggal Merah — side by side below jadwal */}
-          <div className="team-print-bottom-grid grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div
+            className={`team-print-bottom-grid grid gap-5 items-start ${
+              showBarcode
+                ? "with-barcode grid-cols-1 md:grid-cols-[1.1fr_1fr] lg:grid-cols-[1.15fr_1fr_160px]"
+                : "without-barcode grid-cols-1 md:grid-cols-2"
+            }`}
+          >
 
             {/* SPKL Bulan Ini — kiri */}
             <div className="team-print-section bg-white border-[3px] border-black rounded-2xl shadow-[4px_4px_0px_0px_#000] p-5 team-print-schedule overflow-x-auto">
@@ -335,11 +397,12 @@ export default function SchedulePublicAdminView({ schedule }) {
                         <th
                           key={`${item.day}-${item.label}`}
                           title={item.label}
-                          className="px-2 py-2 text-center font-black border-r border-gray-300 min-w-[56px]"
+                          className="px-3 py-2 text-center font-black border-r border-gray-300"
                         >
-                          <span className="flex flex-col items-center leading-tight">
+                          {/* DIKEMBALIKAN KE VERTIKAL AGAR TABEL TIDAK MELAR */}
+                          <span className="flex flex-col items-center justify-center gap-1 leading-tight text-center">
                             <span className="text-sm">{item.day}</span>
-                            <span className="text-[9px] uppercase tracking-widest">{item.label}</span>
+                            <span className="text-[9px] uppercase tracking-widest text-red-600 max-w-[80px]">({item.label})</span>
                           </span>
                         </th>
                       ))}
@@ -373,11 +436,12 @@ export default function SchedulePublicAdminView({ schedule }) {
               {redDateList.length === 0 ? (
                 <p className="text-sm font-bold text-gray-500">Tidak ada tanggal merah terdeteksi.</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
+                // DIUBAH MENJADI FLEX-COL (VERTIKAL)
+                <div className="flex flex-col items-start gap-2">
                   {redDateList.map((item) => (
                     <span
                       key={`${item.day}-${item.label}`}
-                      className="inline-flex items-center gap-2 bg-red-50 border-[2px] border-red-400 text-red-700 rounded-full px-3 py-1 text-xs font-black"
+                      className="inline-flex items-center gap-2 bg-red-50 border-[2px] border-red-400 text-red-700 rounded-full px-3 py-1.5 text-xs font-black"
                       title={item.label}
                     >
                       {item.day} · {item.label}
@@ -386,6 +450,32 @@ export default function SchedulePublicAdminView({ schedule }) {
                 </div>
               )}
             </div>
+
+            {/* Barcode Link Jadwal */}
+            {showBarcode && (
+              <div className="team-print-section team-print-qr p-5 team-print-schedule flex flex-col items-center justify-center">
+                <p className="team-print-title text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3 text-center w-full">
+                  Barcode Link Jadwal
+                </p>
+
+                {qrUrl ? (
+                  <>
+                    <img
+                      src={qrUrl}
+                      alt="Barcode link jadwal karyawan"
+                      className="w-32 h-32 object-contain border-[2px] border-black rounded-lg bg-white p-2"
+                    />
+                    <p className="team-print-qr-text mt-3 text-[10px] font-bold text-gray-600 leading-snug text-center max-w-[160px]">
+                      Scan barcode ini untuk membuka jadwal tim melalui HP.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm font-bold text-gray-500 text-center">
+                    Link jadwal belum tersedia.
+                  </p>
+                )}
+              </div>
+            )}
 
           </div>
 
