@@ -6,7 +6,7 @@ export default function ConfirmModal({ isOpen, title, message, onConfirm, onCanc
   const isDanger = type === "danger";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div 
         className="bg-white border-[4px] border-black shadow-[8px_8px_0px_0px_#111827] w-full max-w-md p-6 sm:p-8 animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
